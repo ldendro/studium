@@ -1,0 +1,1 @@
+Step by step for each phase, starting from the 
