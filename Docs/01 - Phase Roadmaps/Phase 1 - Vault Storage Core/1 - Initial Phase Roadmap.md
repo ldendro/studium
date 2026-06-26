@@ -9,10 +9,6 @@ This phase answers:
 The system should initially operate against a test vault, not the real Obsidian vault. Once the write behavior is stable, it can be connected to the real vault.
 
 ---
-## Branches
-*To be defined in the Phase 1 implementation plan.*
-
----
 ## Why This Phase Comes First
 
 Every later feature depends on reliable vault storage.

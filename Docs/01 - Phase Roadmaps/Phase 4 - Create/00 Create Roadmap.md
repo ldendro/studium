@@ -1157,6 +1157,7 @@ Examples, reflections, comparisons, derivations, and code implementations should
 
 Source files and imported notes should be treated as source attachments/records, not durable concept graph nodes.
 
+
 ### Phase 2 Amendment
 
 The graph should index concept notes as durable nodes.
