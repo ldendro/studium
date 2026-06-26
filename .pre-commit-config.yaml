@@ -1,0 +1,32 @@
+# Docs/ holds Obsidian-managed Markdown notes; exclude them so hooks only
+# touch the Python project and avoid churning hand-authored documentation.
+exclude: '^Docs/'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: pyright
+        name: pyright
+        # Call the project venv's pyright directly so the hook does not depend
+        # on `uv` being on PATH when Git runs hooks (e.g. from a GUI client).
+        # Node is bundled via the pyright[nodejs] wheel, so no download occurs.
+        entry: .venv/bin/pyright
+        language: system
+        types: [python]
+        pass_filenames: false
