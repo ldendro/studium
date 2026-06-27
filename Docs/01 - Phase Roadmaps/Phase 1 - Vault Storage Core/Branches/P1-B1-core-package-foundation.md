@@ -2,7 +2,7 @@
 
 **Phase:** 1 - Vault Storage Core
 **Branch:** 1 - Core Package Foundation 
-**Status:** `in_progress`
+**Status:** `merged`
 
 ---
 
@@ -111,7 +111,7 @@ Please produce a branch implementation plan with:
 
 ## 5. Cursor Implementation Plan
 
-## P1-B1: Core Package Foundation
+### P1-B1: Core Package Foundation
 
 Scoped strictly to branch goal: developer tooling + package/module skeleton. No storage logic (vault access, parsing, schemas, etc. are later branches).
 
