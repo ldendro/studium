@@ -41,12 +41,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B2-vault-access-layer.md",
+                "file": "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B3-concept-note-schemas.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "P1-B2-vault-access-layer"
+              "title": "P1-B3-concept-note-schemas"
             }
           }
         ],
@@ -214,16 +214,17 @@
   },
   "active": "aa32b2940d5e40ef",
   "lastOpenFiles": [
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B1-core-package-foundation.md",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B2-vault-access-layer.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/4 - Branch Plan.md",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/2 - Final Phase Roadmap.md",
+    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B3-concept-note-schemas.md",
+    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/3 - Technical Plan.md",
+    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B2-vault-access-layer.md",
+    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B1-core-package-foundation.md",
     "99 - Archive/Branch - Template.md",
+    "99 - Archive/Branch Plan Template.md",
+    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/2 - Final Phase Roadmap.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/1 - Initial Phase Roadmap.md",
     "99 - Archive/Example Structure.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/3 - Technical Plan.md",
-    "99 - Archive/Branch Plan Template.md",
     "99 - Archive/Technical Plan - Template.md",
     "99 - Archive/Phase Roadmap - Template.md",
     "01 - Phase Roadmaps/Phase 4 - Create/00 Create Roadmap.md",
@@ -250,7 +251,6 @@
     "01 - Phase Roadmaps/Phase 6 - Agent Review",
     "01 - Phase Roadmaps/Phase 5 - Source Content Intelligence",
     "01 - Phase Roadmaps/Phase 4 - Create",
-    "00 - Product Foundation/User Principles.md",
-    "00 - Product Foundation/Product Vision - Studium.md"
+    "00 - Product Foundation/User Principles.md"
   ]
 }
