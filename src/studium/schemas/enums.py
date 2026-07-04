@@ -47,10 +47,16 @@ class ContributionStatus(StrEnum):
 class NoteStatus(StrEnum):
     SCAFFOLDED = "scaffolded"
     IN_PROGRESS = "in_progress"
+    IN_REVIEW = "in_review"
+    COMPLETED = "completed"
+    DEFERRED = "deferred"
+    CANCELLED = "cancelled"
+    ON_HOLD = "on_hold"
 
 
 class ReviewStatus(StrEnum):
     NOT_SUBMITTED = "not_submitted"
+    IN_REVIEW = "in_review"
     APPROVED = "approved"
 
 

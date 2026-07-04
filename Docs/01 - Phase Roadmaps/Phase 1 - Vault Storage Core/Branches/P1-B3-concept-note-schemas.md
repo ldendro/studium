@@ -2,7 +2,7 @@
 
 **Phase:** 1 - Vault Storage Core   
 **Branch:** 3 -  Concept Note Schemas
-**Status:** `in_progress`
+**Status:** `merged`
 
 ---
 
