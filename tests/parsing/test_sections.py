@@ -58,6 +58,38 @@ def test_headings_inside_code_fence_ignored() -> None:
     assert h2_titles == ["Concept Overview"]
 
 
+def test_inner_three_backtick_fence_does_not_close_four_backtick_outer_fence() -> None:
+    body = """# Test Concept
+
+````
+```python
+## Concept Overview
+```
+````
+
+## Concept Overview
+"""
+    sections = parse_markdown_sections(body)
+
+    h2_titles = [heading.title for heading in sections.headings if heading.level == 2]
+    assert h2_titles == ["Concept Overview"]
+
+
+def test_four_backtick_fence_closes_only_with_matching_or_longer_fence() -> None:
+    body = """# Test Concept
+
+````
+## Concept Overview
+`````
+
+## Prerequisites
+"""
+    sections = parse_markdown_sections(body)
+
+    h2_titles = [heading.title for heading in sections.headings if heading.level == 2]
+    assert h2_titles == ["Prerequisites"]
+
+
 def test_h3_headings_not_counted_as_canonical() -> None:
     body = """# Test Concept
 

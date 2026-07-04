@@ -41,24 +41,27 @@ def parse_markdown_sections(body: str) -> ParsedMarkdownSections:
     headings are recorded. Canonical section matching is exact on the stripped
     heading title.
 
+    Fence detection follows CommonMark: a closing fence uses the same character as
+    the opener, is at least as long as the opening fence, and contains only that
+    character (plus optional trailing spaces).
+
     H1 title vs ``canonical_title`` mismatch validation is deferred to B6.
     """
     headings: list[MarkdownHeading] = []
     in_fence = False
-    fence_marker: str | None = None
+    opening_fence: str | None = None
 
     for line_number, line in enumerate(body.splitlines(), start=1):
         stripped = line.strip()
-        fence_match = _FENCE_PATTERN.match(stripped)
+        fence_marker = _opening_fence_marker(stripped)
 
-        if fence_match is not None:
-            marker = fence_match.group(1)
+        if fence_marker is not None:
             if not in_fence:
                 in_fence = True
-                fence_marker = marker[:3]
-            elif fence_marker is not None and stripped.startswith(fence_marker):
+                opening_fence = fence_marker
+            elif opening_fence is not None and _is_closing_fence(stripped, opening_fence):
                 in_fence = False
-                fence_marker = None
+                opening_fence = None
             continue
 
         if in_fence:
@@ -94,3 +97,27 @@ def parse_markdown_sections(body: str) -> ParsedMarkdownSections:
         canonical_present=canonical_present,
         canonical_missing=canonical_missing,
     )
+
+
+def _opening_fence_marker(stripped: str) -> str | None:
+    match = _FENCE_PATTERN.match(stripped)
+    if match is None:
+        return None
+    return match.group(1)
+
+
+def _is_closing_fence(stripped: str, opening_fence: str) -> bool:
+    fence_char = opening_fence[0]
+    opening_length = len(opening_fence)
+
+    run_length = 0
+    for char in stripped:
+        if char == fence_char:
+            run_length += 1
+        else:
+            break
+
+    if run_length < opening_length:
+        return False
+
+    return stripped[run_length:].strip() == ""

@@ -70,3 +70,15 @@ def test_inline_markdown_round_trip_metadata() -> None:
     assert parsed.metadata is not None
     assert parsed.sections.canonical_missing == []
     assert not parsed.critical_errors
+
+
+def test_metadata_with_embedded_dashes_parses_via_high_level() -> None:
+    markdown = build_valid_concept_note_markdown().replace(
+        "      title: Studium",
+        "      title: Studium\n      link: https://example/a---b",
+    )
+    parsed = parse_concept_note(markdown)
+
+    assert parsed.metadata is not None
+    assert parsed.metadata.learning_encounters[0].source.link == "https://example/a---b"
+    assert not parsed.critical_errors

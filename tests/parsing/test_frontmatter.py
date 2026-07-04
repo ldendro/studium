@@ -48,3 +48,18 @@ def test_empty_frontmatter_block_splits() -> None:
 
     assert split.frontmatter_text == ""
     assert split.body == "# Body only metadata-empty\n"
+
+
+def test_metadata_value_with_three_dashes_does_not_close_early() -> None:
+    markdown = """---
+id: concept_test_abc123
+link: https://example/a---b
+description: intro --- outro
+---
+# Body
+"""
+    split = split_frontmatter(markdown)
+
+    assert "link: https://example/a---b" in split.frontmatter_text
+    assert "description: intro --- outro" in split.frontmatter_text
+    assert split.body == "# Body\n"
