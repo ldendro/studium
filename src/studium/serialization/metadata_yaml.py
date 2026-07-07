@@ -63,8 +63,10 @@ def _order_learning_encounter(encounter: Mapping[str, Any]) -> OrderedDict[str, 
             source = encounter.get("source")
             if isinstance(source, Mapping):
                 ordered[key] = _order_source(cast(Mapping[str, Any], source))
-            continue
-        ordered[key] = encounter.get(key)
+            else:
+                ordered[key] = source
+        else:
+            ordered[key] = encounter.get(key)
     return ordered
 
 
