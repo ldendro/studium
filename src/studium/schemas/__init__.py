@@ -4,6 +4,11 @@ Pydantic models for concept note metadata, learning encounters, scaffold
 modules, relationships, validation results, and write proposals.
 """
 
+from studium.schemas.canonical import (
+    CANONICAL_SECTION_TITLES,
+    CANONICAL_YAML_TOP_LEVEL_KEYS,
+    PREREQUISITE_RELATIONSHIP_TYPES,
+)
 from studium.schemas.concept_note import ConceptNoteMetadata
 from studium.schemas.enums import (
     ConceptType,
@@ -30,6 +35,9 @@ from studium.schemas.validation import ValidationIssue, ValidationResult
 from studium.schemas.write_proposal import WriteProposal
 
 __all__ = [
+    "CANONICAL_SECTION_TITLES",
+    "CANONICAL_YAML_TOP_LEVEL_KEYS",
+    "PREREQUISITE_RELATIONSHIP_TYPES",
     "ConceptNoteMetadata",
     "ConceptType",
     "ContributionStatus",

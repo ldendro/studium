@@ -15,8 +15,8 @@ from studium.parsing.markdown_sections import (
     parse_markdown_sections,
 )
 from studium.parsing.models import ParsedConceptNote
-from studium.parsing.sections import CANONICAL_SECTION_TITLES
 from studium.parsing.yaml_frontmatter import YamlParseResult, parse_yaml_frontmatter
+from studium.schemas.canonical import CANONICAL_SECTION_TITLES
 
 __all__ = [
     "CANONICAL_SECTION_TITLES",

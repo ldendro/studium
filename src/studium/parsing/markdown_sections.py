@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from studium.parsing.sections import CANONICAL_SECTION_TITLES
+from studium.schemas.canonical import CANONICAL_SECTION_TITLES
 
 _FENCE_PATTERN = re.compile(r"^(```+|~~~+)")
 
