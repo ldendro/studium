@@ -59,14 +59,11 @@ def metadata_to_ordered_dict(metadata: ConceptNoteMetadata) -> OrderedDict[str, 
 def _order_learning_encounter(encounter: Mapping[str, Any]) -> OrderedDict[str, Any]:
     ordered: OrderedDict[str, Any] = OrderedDict()
     for key in LEARNING_ENCOUNTER_FIELD_ORDER:
-        if key == "source":
-            source = encounter.get("source")
-            if isinstance(source, Mapping):
-                ordered[key] = _order_source(cast(Mapping[str, Any], source))
-            else:
-                ordered[key] = source
+        val = encounter.get(key)
+        if key == "source" and isinstance(val, Mapping):
+            ordered[key] = _order_source(cast(Mapping[str, Any], val))
         else:
-            ordered[key] = encounter.get(key)
+            ordered[key] = val
     return ordered
 
 
