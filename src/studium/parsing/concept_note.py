@@ -6,9 +6,9 @@ from studium.parsing.errors import FrontmatterError, YamlParseError
 from studium.parsing.frontmatter import split_frontmatter
 from studium.parsing.markdown_sections import ParsedMarkdownSections, parse_markdown_sections
 from studium.parsing.models import ParsedConceptNote
-from studium.parsing.sections import CANONICAL_SECTION_TITLES
 from studium.parsing.yaml_frontmatter import parse_yaml_frontmatter
 from studium.schemas import ValidationIssue, ValidationSeverity
+from studium.schemas.canonical import CANONICAL_SECTION_TITLES
 
 
 def parse_concept_note(raw_markdown: str) -> ParsedConceptNote:

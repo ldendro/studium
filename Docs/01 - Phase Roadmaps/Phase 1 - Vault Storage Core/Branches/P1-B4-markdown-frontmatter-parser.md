@@ -1,10 +1,8 @@
-# Branch: `<branch-name>`
-
 ## Branch Summary
 
 **Phase:** 1 - Vault Storage Core   
 **Branch:** 4 -  Markdown Frontmatter Parser
-**Status:** `in_progress`
+**Status:** `merged`
 
 ---
 
