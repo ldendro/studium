@@ -2,7 +2,7 @@
 
 **Phase:** 1 - Vault Storage Core  
 **Branch:** 5 - Concept Note Serialization
-**Status:** `in_progress`
+**Status:** `merged`
 
 ---
 
