@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 from studium.parsing import parse_concept_note
@@ -89,7 +90,7 @@ def validate_generated_concept_note(
         *base_result.critical_errors,
         *base_result.warnings,
     ]
-    issues.extend(_round_trip_issues(metadata, body, operation))
+    issues.extend(round_trip_issues(metadata, body, operation))
     return build_validation_result(issues, operation)
 
 
@@ -103,7 +104,7 @@ def parse_and_validate(
     return parsed, result
 
 
-def _round_trip_issues(
+def round_trip_issues(
     metadata: ConceptNoteMetadata,
     body: str,
     operation: ValidationOperation,
@@ -116,7 +117,9 @@ def _round_trip_issues(
     reparsed = parse_concept_note(serialized)
 
     issues: list[ValidationIssue] = []
-    if reparsed.metadata != metadata:
+    if reparsed.metadata is not None and not metadata_equivalent_after_round_trip(
+        metadata, reparsed.metadata
+    ):
         issues.append(
             ValidationIssue(
                 message="Serialization round-trip changed metadata",
@@ -133,3 +136,30 @@ def _round_trip_issues(
             )
         )
     return issues
+
+
+def _normalize_datetime_for_serialization(dt: datetime) -> datetime:
+    """Match serializer datetime normalization before YAML round-trip comparison."""
+    normalized = dt.astimezone(UTC) if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+    return normalized.replace(microsecond=0)
+
+
+def metadata_equivalent_after_round_trip(
+    original: ConceptNoteMetadata,
+    reparsed: ConceptNoteMetadata,
+) -> bool:
+    """Return whether metadata matches after serialize -> parse normalization."""
+    original_normalized = _metadata_with_serialization_datetimes(original)
+    reparsed_normalized = _metadata_with_serialization_datetimes(reparsed)
+    return original_normalized == reparsed_normalized
+
+
+def _metadata_with_serialization_datetimes(
+    metadata: ConceptNoteMetadata,
+) -> ConceptNoteMetadata:
+    return metadata.model_copy(
+        update={
+            "created_at": _normalize_datetime_for_serialization(metadata.created_at),
+            "updated_at": _normalize_datetime_for_serialization(metadata.updated_at),
+        }
+    )

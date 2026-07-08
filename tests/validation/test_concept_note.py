@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from unittest.mock import patch
+
 from studium.parsing import parse_concept_note
-from studium.schemas import ValidationOperation
-from studium.serialization import create_concept_note_markdown
+from studium.parsing.markdown_sections import ParsedMarkdownSections
+from studium.parsing.models import ParsedConceptNote
+from studium.schemas import ValidationIssue, ValidationOperation, ValidationSeverity
+from studium.serialization import (
+    build_canonical_concept_body,
+    build_concept_note_metadata,
+    create_concept_note_markdown,
+)
 from studium.validation import (
     parse_and_validate,
     validate_generated_concept_note,
     validate_parsed_concept_note,
 )
+from studium.validation.concept_note import metadata_equivalent_after_round_trip
 from tests.parsing.conftest import load_fixture
 from tests.parsing.helpers import build_canonical_body, build_valid_concept_note_markdown
 from tests.serialization.helpers import build_sample_metadata
@@ -129,6 +139,39 @@ def test_create_generated_note_passes_create_validation() -> None:
     assert result.is_valid is True
 
 
+def test_validate_generated_concept_note_with_microsecond_timestamps() -> None:
+    """Fresh metadata from build_concept_note_metadata should pass CREATE validation."""
+    now = datetime.now(UTC)
+    metadata = build_concept_note_metadata(
+        "Fresh Concept",
+        created_at=now,
+        updated_at=now,
+    )
+    body = build_canonical_concept_body(metadata)
+    result = validate_generated_concept_note(
+        metadata,
+        body,
+        operation=ValidationOperation.CREATE,
+    )
+
+    assert result.is_valid is True
+    assert not any(issue.code == "round_trip_metadata_mismatch" for issue in result.critical_errors)
+
+
+def test_metadata_equivalent_after_round_trip_normalizes_microseconds() -> None:
+    now = datetime.now(UTC)
+    metadata = build_concept_note_metadata("Fresh Concept", created_at=now, updated_at=now)
+    truncated = metadata.model_copy(
+        update={
+            "created_at": now.replace(microsecond=0),
+            "updated_at": now.replace(microsecond=0),
+        }
+    )
+
+    assert metadata != truncated
+    assert metadata_equivalent_after_round_trip(metadata, truncated) is True
+
+
 def test_validate_generated_concept_note_round_trip() -> None:
     metadata = build_sample_metadata()
     body = build_canonical_body("Stochastic Gradient Descent")
@@ -150,3 +193,42 @@ def test_parse_and_validate_invalid_yaml_is_critical() -> None:
     assert parsed.metadata is None
     assert result.is_valid is False
     assert any(issue.code == "invalid_yaml" for issue in result.critical_errors)
+
+
+def test_round_trip_skips_metadata_mismatch_when_reparse_fails() -> None:
+    metadata = build_sample_metadata()
+    body = build_canonical_body("Stochastic Gradient Descent")
+    failed_reparse = ParsedConceptNote(
+        raw_markdown="",
+        frontmatter_text="",
+        body="",
+        raw_metadata={},
+        metadata=None,
+        unknown_metadata_fields=[],
+        sections=ParsedMarkdownSections(
+            headings=[],
+            h1_title=None,
+            canonical_present=[],
+            canonical_missing=[],
+        ),
+        critical_errors=[
+            ValidationIssue(
+                message="Invalid YAML frontmatter",
+                severity=ValidationSeverity.CRITICAL,
+                code="invalid_yaml",
+            )
+        ],
+    )
+
+    with patch(
+        "studium.validation.concept_note.parse_concept_note",
+        return_value=failed_reparse,
+    ):
+        result = validate_generated_concept_note(
+            metadata,
+            body,
+            operation=ValidationOperation.CREATE,
+        )
+
+    codes = [issue.code for issue in result.critical_errors]
+    assert codes == ["round_trip_parse_errors"]

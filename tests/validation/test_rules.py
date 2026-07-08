@@ -6,6 +6,7 @@ from studium.schemas import ConceptType, SourceType
 from studium.validation.rules import (
     check_h1_title_match,
     check_multiple_primary_encounters,
+    check_multiple_primary_encounters_raw,
     validate_raw_metadata_enums,
 )
 from tests.serialization.helpers import build_sample_metadata
@@ -50,6 +51,14 @@ def test_validate_raw_metadata_enums_ignores_known_values() -> None:
     )
 
     assert issues == []
+
+
+def test_check_multiple_primary_encounters_handles_none_and_empty() -> None:
+    assert check_multiple_primary_encounters(None) == []
+    assert check_multiple_primary_encounters([]) == []
+    assert check_multiple_primary_encounters_raw({}) == []
+    assert check_multiple_primary_encounters_raw({"learning_encounters": []}) == []
+    assert check_multiple_primary_encounters_raw({"learning_encounters": None}) == []
 
 
 def test_check_multiple_primary_encounters() -> None:

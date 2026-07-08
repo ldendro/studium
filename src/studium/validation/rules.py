@@ -19,6 +19,9 @@ from studium.schemas import (
 )
 
 _ENUM_PYDANTIC_CODES = frozenset({"enum", "literal_error"})
+_ALLOWED_CONCEPT_TYPES = frozenset(member.value for member in ConceptType)
+_ALLOWED_SOURCE_TYPES = frozenset(member.value for member in SourceType)
+_ALLOWED_SCAFFOLD_MODULE_TYPES = frozenset(member.value for member in ScaffoldModuleType)
 
 
 def validate_raw_metadata_enums(raw_metadata: Mapping[str, Any]) -> list[ValidationIssue]:
@@ -26,8 +29,7 @@ def validate_raw_metadata_enums(raw_metadata: Mapping[str, Any]) -> list[Validat
     issues: list[ValidationIssue] = []
 
     concept_type = raw_metadata.get("concept_type")
-    allowed_concept_types = {member.value for member in ConceptType}
-    if isinstance(concept_type, str) and concept_type not in allowed_concept_types:
+    if isinstance(concept_type, str) and concept_type not in _ALLOWED_CONCEPT_TYPES:
         issues.append(
             ValidationIssue(
                 message=f"Unknown concept_type: {concept_type}",
@@ -49,9 +51,7 @@ def validate_raw_metadata_enums(raw_metadata: Mapping[str, Any]) -> list[Validat
                 continue
             source_map = cast(Mapping[str, Any], source)
             source_type = source_map.get("type")
-            if isinstance(source_type, str) and source_type not in {
-                member.value for member in SourceType
-            }:
+            if isinstance(source_type, str) and source_type not in _ALLOWED_SOURCE_TYPES:
                 issues.append(
                     ValidationIssue(
                         message=f"Unknown source type: {source_type}",
@@ -69,9 +69,7 @@ def validate_raw_metadata_enums(raw_metadata: Mapping[str, Any]) -> list[Validat
                 continue
             module_map = cast(Mapping[str, Any], module)
             module_type = module_map.get("type")
-            if isinstance(module_type, str) and module_type not in {
-                member.value for member in ScaffoldModuleType
-            }:
+            if isinstance(module_type, str) and module_type not in _ALLOWED_SCAFFOLD_MODULE_TYPES:
                 issues.append(
                     ValidationIssue(
                         message=f"Unknown scaffold module type: {module_type}",
@@ -151,9 +149,12 @@ def check_missing_aliases(metadata: ConceptNoteMetadata) -> list[ValidationIssue
 
 
 def check_multiple_primary_encounters(
-    encounters: list[LearningEncounter],
+    encounters: list[LearningEncounter] | None,
 ) -> list[ValidationIssue]:
     """Detect more than one primary learning encounter."""
+    if not encounters:
+        return []
+
     primary_count = sum(1 for encounter in encounters if encounter.role == EncounterRole.PRIMARY)
     if primary_count <= 1:
         return []
@@ -172,7 +173,7 @@ def check_multiple_primary_encounters_raw(
 ) -> list[ValidationIssue]:
     """Detect multiple primary encounters in raw metadata when models are unavailable."""
     encounters = raw_metadata.get("learning_encounters")
-    if not isinstance(encounters, list):
+    if not isinstance(encounters, list) or not encounters:
         return []
 
     primary_count = 0
