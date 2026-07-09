@@ -38,8 +38,12 @@ def _storage_critical_issue(code: str, message: str) -> ValidationIssue:
     )
 
 
+def _has_markdown_extension(target_path: str) -> bool:
+    return Path(target_path).suffix.lower() == ".md"
+
+
 def _extension_issue(target_path: str) -> ValidationIssue | None:
-    if Path(target_path).suffix.lower() != ".md":
+    if not _has_markdown_extension(target_path):
         return _storage_critical_issue(
             "invalid_target_extension",
             f"Expected a Markdown file (.md): {target_path}",
@@ -131,8 +135,14 @@ def build_update_note_proposal(
     vault: Vault,
     target_path: str,
     after_content: str,
+    *,
+    before_content: str | None = None,
 ) -> WriteProposal:
-    """Build an update-note proposal with before/after content and stale-write hash."""
+    """Build an update-note proposal with before/after content and stale-write hash.
+
+    When ``before_content`` is provided, the vault file is not read again and
+    existence is assumed from the caller's prior read.
+    """
     vault.resolve_path(target_path)
 
     critical_errors: list[ValidationIssue] = []
@@ -142,15 +152,25 @@ def build_update_note_proposal(
     if extension_error is not None:
         critical_errors.append(extension_error)
 
-    target_exists = vault.exists(target_path)
-    before_content: str | None
+    resolved_before_content: str | None
     expected_existing_hash: str | None
+    has_valid_extension = extension_error is None
 
-    if target_exists:
-        before_content = vault.read_markdown(target_path)
+    if before_content is not None:
+        target_exists = True
+        resolved_before_content = before_content
         expected_existing_hash = hash_file_content(before_content)
+    elif has_valid_extension and vault.exists(target_path):
+        target_exists = True
+        resolved_before_content = vault.read_markdown(target_path)
+        expected_existing_hash = hash_file_content(resolved_before_content)
+    elif vault.exists(target_path):
+        target_exists = True
+        resolved_before_content = None
+        expected_existing_hash = None
     else:
-        before_content = None
+        target_exists = False
+        resolved_before_content = None
         expected_existing_hash = None
         critical_errors.append(
             _storage_critical_issue(
@@ -166,7 +186,7 @@ def build_update_note_proposal(
     return _build_write_proposal(
         operation=WriteOperation.UPDATE_NOTE,
         target_path=target_path,
-        before_content=before_content,
+        before_content=resolved_before_content,
         after_content=after_content,
         warnings=warnings,
         critical_errors=critical_errors,
@@ -189,13 +209,22 @@ def build_metadata_update_proposal(
         update={"updated_at": datetime.now(UTC).replace(microsecond=0)}
     )
 
-    if vault.exists(target_path):
-        parsed = parse_concept_note(vault.read_markdown(target_path))
-        effective_body = body if body is not None else parsed.body
+    existing_content: str | None = None
+    has_valid_extension = _has_markdown_extension(target_path)
+
+    if has_valid_extension and vault.exists(target_path):
+        existing_content = vault.read_markdown(target_path)
+        parsed = parse_concept_note(existing_content)
+        effective_body = body if body is not None else (parsed.body or "")
     else:
         effective_body = (
             body if body is not None else build_canonical_concept_body(updated_metadata)
         )
 
     after_content = serialize_concept_note(updated_metadata, effective_body)
-    return build_update_note_proposal(vault, target_path, after_content)
+    return build_update_note_proposal(
+        vault,
+        target_path,
+        after_content,
+        before_content=existing_content,
+    )
