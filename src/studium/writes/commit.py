@@ -24,7 +24,8 @@ def commit_write_proposal(vault: Vault, proposal: WriteProposal) -> None:
             msg = f"Target file not found: {proposal.target_path}"
             raise WriteProposalBlockedError(msg, proposal=proposal)
 
-        current_content = vault.read_markdown(proposal.target_path)
+        resolved = vault.resolve_path(proposal.target_path)
+        current_content = resolved.read_text(encoding="utf-8")
         current_hash = hash_file_content(current_content)
         if current_hash != proposal.expected_existing_hash:
             msg = f"File changed since proposal was built: {proposal.target_path}"

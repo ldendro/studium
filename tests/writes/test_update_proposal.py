@@ -6,7 +6,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from studium.serialization import create_concept_note_markdown, serialize_concept_note
-from studium.writes import build_metadata_update_proposal, build_update_note_proposal
+from studium.writes import (
+    build_metadata_update_proposal,
+    build_update_note_proposal,
+    hash_file_content,
+)
 from tests.parsing.conftest import load_fixture
 from tests.serialization.helpers import build_sample_metadata
 from tests.writes.conftest import make_vault, seed_note
@@ -126,7 +130,8 @@ def test_update_proposal_rejects_non_markdown_target(tmp_path: Path) -> None:
 
 def test_update_proposal_existing_non_markdown_target_returns_proposal(tmp_path: Path) -> None:
     vault_root, vault = make_vault(tmp_path)
-    seed_note(vault_root, "concepts/note.txt", "plain text")
+    content = "plain text"
+    seed_note(vault_root, "concepts/note.txt", content)
 
     proposal = build_update_note_proposal(
         vault,
@@ -135,7 +140,8 @@ def test_update_proposal_existing_non_markdown_target_returns_proposal(tmp_path:
     )
 
     assert any(issue.code == "invalid_target_extension" for issue in proposal.critical_errors)
-    assert proposal.before_content is None
+    assert proposal.before_content == content
+    assert proposal.expected_existing_hash == hash_file_content(content)
     assert proposal.would_update is True
     assert proposal.would_overwrite is True
 
@@ -144,13 +150,15 @@ def test_metadata_update_proposal_existing_non_markdown_target_returns_proposal(
     tmp_path: Path,
 ) -> None:
     vault_root, vault = make_vault(tmp_path)
-    seed_note(vault_root, "concepts/note.txt", "plain text")
+    content = "plain text"
+    seed_note(vault_root, "concepts/note.txt", content)
     metadata = build_sample_metadata()
 
     proposal = build_metadata_update_proposal(vault, "concepts/note.txt", metadata)
 
     assert any(issue.code == "invalid_target_extension" for issue in proposal.critical_errors)
-    assert proposal.before_content is None
+    assert proposal.before_content == content
+    assert proposal.expected_existing_hash == hash_file_content(content)
 
 
 def test_metadata_update_proposal_when_file_missing_uses_canonical_body(tmp_path: Path) -> None:

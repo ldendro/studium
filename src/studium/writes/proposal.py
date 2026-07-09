@@ -51,6 +51,11 @@ def _extension_issue(target_path: str) -> ValidationIssue | None:
     return None
 
 
+def _read_vault_file_content(vault: Vault, target_path: str) -> str:
+    """Read vault file bytes as UTF-8 text without enforcing a Markdown extension."""
+    return vault.resolve_path(target_path).read_text(encoding="utf-8")
+
+
 def _build_write_proposal(
     *,
     operation: WriteOperation,
@@ -166,8 +171,8 @@ def build_update_note_proposal(
         expected_existing_hash = hash_file_content(resolved_before_content)
     elif vault.exists(target_path):
         target_exists = True
-        resolved_before_content = None
-        expected_existing_hash = None
+        resolved_before_content = _read_vault_file_content(vault, target_path)
+        expected_existing_hash = hash_file_content(resolved_before_content)
     else:
         target_exists = False
         resolved_before_content = None
@@ -216,6 +221,11 @@ def build_metadata_update_proposal(
         existing_content = vault.read_markdown(target_path)
         parsed = parse_concept_note(existing_content)
         effective_body = body if body is not None else (parsed.body or "")
+    elif vault.exists(target_path):
+        existing_content = _read_vault_file_content(vault, target_path)
+        effective_body = (
+            body if body is not None else build_canonical_concept_body(updated_metadata)
+        )
     else:
         effective_body = (
             body if body is not None else build_canonical_concept_body(updated_metadata)

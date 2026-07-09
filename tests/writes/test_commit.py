@@ -18,6 +18,7 @@ from studium.writes import (
     build_metadata_update_proposal,
     build_update_note_proposal,
     commit_write_proposal,
+    hash_file_content,
 )
 from tests.parsing.conftest import load_fixture
 from tests.serialization.helpers import build_sample_metadata
@@ -130,6 +131,28 @@ def test_commit_update_raises_when_file_deleted(tmp_path: Path) -> None:
 
     with pytest.raises(WriteProposalBlockedError, match="not found"):
         commit_write_proposal(vault, proposal)
+
+
+def test_commit_update_non_markdown_does_not_false_positive_stale_when_unchanged(
+    tmp_path: Path,
+) -> None:
+    vault_root, vault = make_vault(tmp_path)
+    content = "plain text"
+    seed_note(vault_root, "concepts/note.txt", content)
+    proposal = build_update_note_proposal(
+        vault,
+        "concepts/note.txt",
+        create_concept_note_markdown("Replacement Concept"),
+    )
+
+    committable = proposal.model_copy(update={"critical_errors": []})
+    assert committable.expected_existing_hash == hash_file_content(content)
+
+    commit_write_proposal(vault, committable)
+
+    assert vault.resolve_path("concepts/note.txt").read_text(encoding="utf-8") == (
+        committable.after_content
+    )
 
 
 def test_commit_allows_warnings_only_proposal(tmp_path: Path) -> None:
