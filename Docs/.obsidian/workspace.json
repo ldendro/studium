@@ -13,30 +13,15 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/4 - Branch Plan.md",
+                "file": "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B8-cli-and-phase-verification.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "4 - Branch Plan"
-            }
-          },
-          {
-            "id": "81280ec7218fcd81",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B7-write-proposals-vault-writes.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "P1-B7-write-proposals-vault-writes"
+              "title": "P1-B8-cli-and-phase-verification"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -198,13 +183,14 @@
       "bases:Create new base": false
     }
   },
-  "active": "81280ec7218fcd81",
+  "active": "aa32b2940d5e40ef",
   "lastOpenFiles": [
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/4 - Branch Plan.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B7-write-proposals-vault-writes.md",
+    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B8-cli-and-phase-verification.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/00 Concept Graph Core Roadmap.md",
+    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/4 - Branch Plan.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B6-validation-layer.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B5-concept-note-serialization.md",
-    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/00 Concept Graph Core Roadmap.md",
     "99 - Archive/Branch - Template.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B3-concept-note-schemas.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B4-markdown-frontmatter-parser.md",
@@ -229,7 +215,6 @@
     "01 - Phase Roadmaps/Phase 6 - Agent Review/00 Agent Review Roadmap.md",
     "01 - Phase Roadmaps/Phase 11 - Productization & Multi-User Platform/Productization & Multi-User Platform Roadmap.md",
     "01 - Phase Roadmaps/Phase 10 - Personal Learning Model/Personal Learning Model Roadmap.md",
-    "01 - Phase Roadmaps/Phase 9 - Mastery Dashboard/Mastery Dashboard Roadmap.md",
     "01 - Phase Roadmaps/Phase 11 - Productization & Multi-User Platform",
     "01 - Phase Roadmaps/Phase 10 - Personal Learning Model",
     "01 - Phase Roadmaps/Phase 9 - Mastery Dashboard",
