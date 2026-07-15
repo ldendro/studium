@@ -39,6 +39,26 @@ uv run pre-commit run --all-files  # run all pre-commit hooks
 A `Makefile` provides shortcuts: `make install`, `make test`, `make lint`,
 `make typecheck`, `make check`.
 
+## CLI (Phase 1)
+
+After `uv sync --extra dev`, use the `studium` console script:
+
+```bash
+# Create a concept note (prints write proposal, then commits unless --dry-run)
+uv run studium create-concept "Stochastic Gradient Descent" --vault /tmp/studium-test-vault
+
+# Preview a create without writing
+uv run studium create-concept "Stochastic Gradient Descent" --vault /tmp/studium-test-vault --dry-run
+
+# Validate one note (vault-relative path)
+uv run studium validate-note concepts/stochastic-gradient-descent.md --vault /tmp/studium-test-vault
+
+# Validate an entire vault directory
+uv run studium validate-vault tests/fixtures/test_vault
+```
+
+Default create path is `concepts/<hyphen-slug>.md`. Exit code `1` means critical validation or write errors; warnings alone still exit `0`.
+
 ## Project structure
 
 ```

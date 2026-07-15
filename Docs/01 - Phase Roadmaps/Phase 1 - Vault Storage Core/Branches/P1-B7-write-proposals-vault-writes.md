@@ -2,7 +2,7 @@
 
 **Phase:** 1 - Vault Storage Core
 **Branch:** 7 - Write Proposals and Vault Writes
-**Status:** `in_progress`
+**Status:** `merged`
 
 ---
 
