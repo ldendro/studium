@@ -16,18 +16,21 @@ def default_concept_path(canonical_title: str) -> str:
 
 
 def resolve_note_path(vault: Vault, path_arg: str) -> str:
-    """Resolve a CLI note path to a vault-relative POSIX path.
+    """Resolve a CLI note path to a normalized vault-relative POSIX path.
 
     Absolute paths are accepted only when they resolve under the vault root.
+    Relative paths are resolved against the vault root so ``.`` / ``..`` components
+    are normalized before returning.
     """
     candidate = Path(path_arg)
+    root = vault.root
+
     if candidate.is_absolute():
         resolved = candidate.resolve()
-        root = vault.root
         if not (resolved == root or resolved.is_relative_to(root)):
             msg = f"Path escapes vault root: {path_arg}"
             raise VaultPathError(msg)
-        return resolved.relative_to(root).as_posix()
+    else:
+        resolved = vault.resolve_path(path_arg)
 
-    vault.resolve_path(path_arg)
-    return Path(path_arg).as_posix()
+    return resolved.relative_to(root).as_posix()

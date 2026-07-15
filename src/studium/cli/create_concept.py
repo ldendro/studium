@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from studium.cli.formatting import format_create_committed, format_write_proposal
-from studium.cli.paths import default_concept_path
+from studium.cli.paths import default_concept_path, resolve_note_path
 from studium.vault import Vault
 from studium.vault.errors import VaultError
 from studium.writes import (
@@ -25,7 +25,10 @@ def cmd_create_concept(args: Namespace) -> int:
     """Create a concept note via write proposal, optionally committing it."""
     try:
         vault = Vault(Path(args.vault))
-        target_path = args.path if args.path else default_concept_path(args.title)
+        if args.path:
+            target_path = resolve_note_path(vault, args.path)
+        else:
+            target_path = default_concept_path(args.title)
         proposal = build_create_note_proposal_from_title(vault, target_path, args.title)
 
         print(format_write_proposal(proposal, dry_run=bool(args.dry_run)))

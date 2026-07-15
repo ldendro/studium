@@ -6,7 +6,7 @@ from argparse import Namespace
 from pathlib import Path
 
 from studium.cli.formatting import format_validation_result
-from studium.schemas import ValidationOperation, ValidationResult
+from studium.schemas import ValidationOperation
 from studium.validation import parse_and_validate
 from studium.vault import Vault
 from studium.vault.errors import VaultError
@@ -17,14 +17,12 @@ def cmd_validate_vault(args: Namespace) -> int:
     try:
         vault = Vault(Path(args.vault_dir))
         paths = vault.list_markdown_files()
-        results: list[tuple[str, ValidationResult]] = []
         critical_count = 0
         warning_count = 0
 
         for relative_path in paths:
             raw = vault.read_markdown(relative_path)
             _, result = parse_and_validate(raw, operation=ValidationOperation.PARSE)
-            results.append((relative_path, result))
             critical_count += len(result.critical_errors)
             warning_count += len(result.warnings)
             print(format_validation_result(relative_path, result))
