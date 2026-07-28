@@ -16,7 +16,7 @@ def build_valid_frontmatter_yaml(**overrides: Any) -> str:
 
     lines = [
         f"id: {data['id']}",
-        "schema_version: 1",
+        "schema_version: 2",
         "note_type: concept",
         f"concept_type: {data['concept_type']}",
         "concept_domains: []",

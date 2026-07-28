@@ -1,6 +1,6 @@
 ---
 id: concept_missing_relationship_d4e5f6
-schema_version: 1
+schema_version: 2
 note_type: concept
 concept_type: algorithm
 concept_domains:
@@ -25,9 +25,12 @@ learning_encounters:
 scaffold_modules: []
 relationships:
   - relationship_type: depends_on
-    target_title: Partial Derivatives
     target_id:
+    target_title: Partial Derivatives
     vault_status: missing
+    learning_role: mathematical_prerequisite
+    confidence: high
+    status: agent_suggested
 created_at: 2026-06-25T00:00:00Z
 updated_at: 2026-06-25T00:00:00Z
 ---

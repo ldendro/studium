@@ -11,9 +11,12 @@ from studium.schemas import (
     ContributionStatus,
     EncounterRole,
     LearningEncounter,
+    LearningRole,
     NoteStatus,
     NoteVaultStatus,
+    RelationshipConfidence,
     RelationshipMetadata,
+    RelationshipStatus,
     RelationshipType,
     RelationshipVaultStatus,
     ReviewStatus,
@@ -30,7 +33,7 @@ def build_sample_metadata(**overrides: Any) -> ConceptNoteMetadata:
     now = datetime(2026, 6, 25, tzinfo=UTC)
     data: dict[str, Any] = {
         "id": "concept_stochastic_gradient_descent_a1b2c3",
-        "schema_version": 1,
+        "schema_version": 2,
         "note_type": "concept",
         "concept_type": ConceptType.ALGORITHM,
         "concept_domains": ["machine_learning", "optimization"],
@@ -64,12 +67,18 @@ def build_metadata_with_relationships() -> ConceptNoteMetadata:
                 relationship_type=RelationshipType.DEPENDS_ON,
                 target_title="Partial Derivatives",
                 vault_status=RelationshipVaultStatus.MISSING,
+                learning_role=LearningRole.MATHEMATICAL_PREREQUISITE,
+                confidence=RelationshipConfidence.HIGH,
+                status=RelationshipStatus.AGENT_SUGGESTED,
             ),
             RelationshipMetadata(
                 relationship_type=RelationshipType.RELATED_TO,
                 target_title="Gradient Descent",
                 vault_status=RelationshipVaultStatus.FOUND,
                 target_id="concept_gradient_descent_x1y2z3",
+                learning_role=LearningRole.SUPPORTING_CONCEPT,
+                confidence=RelationshipConfidence.HIGH,
+                status=RelationshipStatus.AGENT_SUGGESTED,
             ),
         ]
     )

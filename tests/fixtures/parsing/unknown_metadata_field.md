@@ -1,6 +1,6 @@
 ---
 id: concept_unknown_field_a1b2c3
-schema_version: 1
+schema_version: 2
 note_type: concept
 concept_type: general_concept
 concept_domains: []

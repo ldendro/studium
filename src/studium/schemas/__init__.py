@@ -14,8 +14,11 @@ from studium.schemas.enums import (
     ConceptType,
     ContributionStatus,
     EncounterRole,
+    LearningRole,
     NoteStatus,
     NoteVaultStatus,
+    RelationshipConfidence,
+    RelationshipStatus,
     RelationshipType,
     RelationshipVaultStatus,
     ReviewStatus,
@@ -30,7 +33,7 @@ from studium.schemas.enums import (
 from studium.schemas.learning_encounter import LearningEncounter, default_studium_learning_encounter
 from studium.schemas.relationship import RelationshipMetadata
 from studium.schemas.scaffold_module import ScaffoldModuleMetadata
-from studium.schemas.source import SourceMetadata
+from studium.schemas.source import ExternalId, SourceMetadata
 from studium.schemas.validation import ValidationIssue, ValidationResult
 from studium.schemas.write_proposal import WriteProposal
 
@@ -42,10 +45,14 @@ __all__ = [
     "ConceptType",
     "ContributionStatus",
     "EncounterRole",
+    "ExternalId",
     "LearningEncounter",
+    "LearningRole",
     "NoteStatus",
     "NoteVaultStatus",
+    "RelationshipConfidence",
     "RelationshipMetadata",
+    "RelationshipStatus",
     "RelationshipType",
     "RelationshipVaultStatus",
     "ReviewStatus",

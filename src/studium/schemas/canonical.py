@@ -38,6 +38,7 @@ SOURCE_FIELD_ORDER: tuple[str, ...] = (
     "unit",
     "section",
     "link",
+    "external_id",
 )
 
 LEARNING_ENCOUNTER_FIELD_ORDER: tuple[str, ...] = (
@@ -62,6 +63,9 @@ RELATIONSHIP_FIELD_ORDER: tuple[str, ...] = (
     "target_id",
     "target_title",
     "vault_status",
+    "learning_role",
+    "confidence",
+    "status",
 )
 
 PREREQUISITE_RELATIONSHIP_TYPES: frozenset[RelationshipType] = frozenset(

@@ -36,6 +36,9 @@ def test_metadata_yaml_includes_relationship_target_id_null() -> None:
                 "target_title": "Chain Rule",
                 "vault_status": "unresolved",
                 "target_id": None,
+                "learning_role": "mathematical_prerequisite",
+                "confidence": "high",
+                "status": "agent_suggested",
             }
         ]
     )
@@ -43,3 +46,29 @@ def test_metadata_yaml_includes_relationship_target_id_null() -> None:
 
     assert "target_id:" in yaml_text
     assert "target_title: Chain Rule" in yaml_text
+    assert "learning_role: mathematical_prerequisite" in yaml_text
+    assert "confidence: high" in yaml_text
+    assert "status: agent_suggested" in yaml_text
+
+
+def test_metadata_yaml_includes_external_id() -> None:
+    metadata = build_sample_metadata(
+        learning_encounters=[
+            {
+                "source": {
+                    "type": "paper",
+                    "title": "Example Paper",
+                    "external_id": {"type": "doi", "value": "10.1234/example"},
+                },
+                "role": "primary",
+                "contribution_status": "pending",
+                "content_attached": False,
+                "content_id": None,
+            }
+        ]
+    )
+    yaml_text = serialize_metadata_to_yaml(metadata)
+
+    assert "external_id:" in yaml_text
+    assert "type: doi" in yaml_text
+    assert "value: 10.1234/example" in yaml_text

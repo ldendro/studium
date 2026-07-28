@@ -7,6 +7,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from studium.schemas.enums import SourceType
 
 
+class ExternalId(BaseModel):
+    """Typed optional external identifier for a source."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = Field(min_length=1)
+    value: str = Field(min_length=1)
+
+
 class SourceMetadata(BaseModel):
     """Structured source reference attached to a learning encounter."""
 
@@ -18,3 +27,4 @@ class SourceMetadata(BaseModel):
     unit: str | None = None
     section: str | None = None
     link: str | None = None
+    external_id: ExternalId | None = None

@@ -1,6 +1,6 @@
 ---
 id: concept_broken
-schema_version: 1
+schema_version: 2
 note_type: concept
 concept_type: algorithm
 canonical_title: Broken YAML

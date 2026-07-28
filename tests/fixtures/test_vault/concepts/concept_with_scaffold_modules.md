@@ -1,6 +1,6 @@
 ---
 id: concept_scaffold_modules_c3d4e5
-schema_version: 1
+schema_version: 2
 note_type: concept
 concept_type: algorithm
 concept_domains:
