@@ -99,7 +99,14 @@ def rebuild_index(config: IndexConfig) -> Engine:
     initialize_index(engine, config)
     now = _utc_now_iso()
     with begin_connection(engine) as connection:
-        connection.execute(index_metadata.update().values(last_rebuild_at=now, updated_at=now))
+        row = connection.execute(select(index_metadata.c.id).limit(1)).first()
+        if row is None:
+            raise IndexNotInitializedError("Index metadata is missing after rebuild initialize.")
+        connection.execute(
+            index_metadata.update()
+            .where(index_metadata.c.id == row.id)
+            .values(last_rebuild_at=now, updated_at=now)
+        )
     return engine
 
 
