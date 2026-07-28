@@ -59,6 +59,20 @@ uv run studium validate-vault tests/fixtures/test_vault
 
 Default create path is `concepts/<hyphen-slug>.md`. Exit code `1` means critical validation or write errors; warnings alone still exit `0`.
 
+## Derived concept index (Phase 2)
+
+Valid concept notes are projected into a rebuildable SQLite index **outside** the
+Obsidian vault:
+
+```text
+<Studium application data>/indexes/<vault_identifier>/concept-index.sqlite
+```
+
+Application data defaults to the OS user data directory for `studium`
+(`platformdirs`). Tests and tooling can override the root. The index schema is
+versioned independently from concept-note `schema_version`; incompatible indexes
+must be rebuilt rather than migrated.
+
 ## Project structure
 
 ```
@@ -70,6 +84,7 @@ src/studium/
   validation/     # critical-error / warning validation (P1-B6)
   writes/         # safe write proposals + vault writes (P1-B7)
   cli/            # minimal CLI (P1-B8)
+  index/          # SQLite derived index + repositories (P2-B02)
 tests/            # pytest test suite
 ```
 
