@@ -29,7 +29,7 @@ class ConceptNoteMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1)
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     note_type: Literal["concept"] = "concept"
     concept_type: ConceptType = ConceptType.GENERAL_CONCEPT
     concept_domains: list[ConceptDomain] = Field(default_factory=list)

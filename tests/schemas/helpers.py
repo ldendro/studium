@@ -10,7 +10,7 @@ def build_minimal_concept_note_data(**overrides: Any) -> dict[str, Any]:
     """Build minimal valid concept note metadata with optional field overrides."""
     base: dict[str, Any] = {
         "id": "concept_test_abc123",
-        "schema_version": 1,
+        "schema_version": 2,
         "note_type": "concept",
         "concept_type": "general_concept",
         "concept_domains": [],

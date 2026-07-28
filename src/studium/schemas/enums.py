@@ -102,6 +102,30 @@ class RelationshipType(StrEnum):
     CONTRASTS_WITH = "contrasts_with"
 
 
+class LearningRole(StrEnum):
+    MATHEMATICAL_PREREQUISITE = "mathematical_prerequisite"
+    CONCEPTUAL_PREREQUISITE = "conceptual_prerequisite"
+    IMPLEMENTATION_PREREQUISITE = "implementation_prerequisite"
+    FOUNDATIONAL_THEORY = "foundational_theory"
+    BROADER_PARENT_CONCEPT = "broader_parent_concept"
+    SPECIALIZED_CHILD_CONCEPT = "specialized_child_concept"
+    ALTERNATIVE_VARIANT = "alternative_variant"
+    COMPARISON_TARGET = "comparison_target"
+    SUPPORTING_CONCEPT = "supporting_concept"
+    APPLICATION_CONTEXT = "application_context"
+
+
+class RelationshipConfidence(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class RelationshipStatus(StrEnum):
+    AGENT_SUGGESTED = "agent_suggested"
+    USER_CONFIRMED = "user_confirmed"
+
+
 class RelationshipVaultStatus(StrEnum):
     FOUND = "found"
     MISSING = "missing"

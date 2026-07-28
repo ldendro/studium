@@ -68,7 +68,17 @@ def _order_learning_encounter(encounter: Mapping[str, Any]) -> OrderedDict[str, 
 
 
 def _order_source(source: Mapping[str, Any]) -> OrderedDict[str, Any]:
-    return OrderedDict((key, source.get(key)) for key in SOURCE_FIELD_ORDER)
+    ordered: OrderedDict[str, Any] = OrderedDict()
+    for key in SOURCE_FIELD_ORDER:
+        val = source.get(key)
+        if key == "external_id" and isinstance(val, Mapping):
+            external = cast(Mapping[str, Any], val)
+            ordered[key] = OrderedDict(
+                (("type", external.get("type")), ("value", external.get("value")))
+            )
+        else:
+            ordered[key] = val
+    return ordered
 
 
 def _order_scaffold_module(module: Mapping[str, Any]) -> OrderedDict[str, Any]:

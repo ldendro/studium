@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from studium.parsing.errors import YamlParseError
 from studium.schemas import ConceptNoteMetadata, ValidationIssue, ValidationSeverity
 
-_OPTIONAL_SOURCE_FIELDS = ("unit_type", "unit", "section", "link")
+_OPTIONAL_SOURCE_FIELDS = ("unit_type", "unit", "section", "link", "external_id")
 
 
 @dataclass(frozen=True)

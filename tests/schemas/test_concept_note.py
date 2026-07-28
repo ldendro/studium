@@ -15,7 +15,7 @@ def test_valid_full_metadata_constructs(valid_concept_note_data: dict[str, Any])
     note = ConceptNoteMetadata.model_validate(valid_concept_note_data)
 
     assert note.id == "concept_stochastic_gradient_descent_a1b2c3"
-    assert note.schema_version == 1
+    assert note.schema_version == 2
     assert note.note_type == "concept"
     assert note.concept_type == ConceptType.ALGORITHM
     assert note.concept_domains == ["machine_learning", "optimization"]
@@ -32,7 +32,7 @@ def test_missing_required_field_raises() -> None:
 
 
 def test_invalid_schema_version_raises() -> None:
-    data = build_minimal_concept_note_data(schema_version=2)
+    data = build_minimal_concept_note_data(schema_version=1)
 
     with pytest.raises(ValidationError):
         ConceptNoteMetadata.model_validate(data)

@@ -55,3 +55,40 @@ def test_optional_source_fields_default_to_none() -> None:
     assert source.unit is None
     assert source.section is None
     assert source.link is None
+    assert source.external_id is None
+
+
+def test_external_id_accepted_when_complete() -> None:
+    source = SourceMetadata.model_validate(
+        {
+            "type": "paper",
+            "title": "Example Paper",
+            "external_id": {"type": "doi", "value": "10.1234/example"},
+        }
+    )
+
+    assert source.external_id is not None
+    assert source.external_id.type == "doi"
+    assert source.external_id.value == "10.1234/example"
+
+
+def test_external_id_empty_type_raises() -> None:
+    with pytest.raises(ValidationError):
+        SourceMetadata.model_validate(
+            {
+                "type": "paper",
+                "title": "Example Paper",
+                "external_id": {"type": "", "value": "10.1234/example"},
+            }
+        )
+
+
+def test_external_id_empty_value_raises() -> None:
+    with pytest.raises(ValidationError):
+        SourceMetadata.model_validate(
+            {
+                "type": "paper",
+                "title": "Example Paper",
+                "external_id": {"type": "doi", "value": ""},
+            }
+        )

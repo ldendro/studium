@@ -14,7 +14,7 @@ def valid_concept_note_data() -> dict[str, Any]:
     """Dict matching Technical Plan §5.1 example."""
     return {
         "id": "concept_stochastic_gradient_descent_a1b2c3",
-        "schema_version": 1,
+        "schema_version": 2,
         "note_type": "concept",
         "concept_type": "algorithm",
         "concept_domains": ["machine_learning", "optimization"],

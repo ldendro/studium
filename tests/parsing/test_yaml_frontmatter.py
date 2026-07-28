@@ -47,7 +47,7 @@ def test_unknown_fields_stripped_and_reported() -> None:
 
 def test_empty_strings_normalized_to_none() -> None:
     yaml_text = """id: concept_test_abc123
-schema_version: 1
+schema_version: 2
 note_type: concept
 concept_type: general_concept
 concept_domains: []

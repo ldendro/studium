@@ -1,6 +1,6 @@
 ---
 id: concept_external_source_note_b2c3d4
-schema_version: 1
+schema_version: 2
 note_type: concept
 concept_type: algorithm
 concept_domains:
