@@ -478,9 +478,9 @@ uv run pytest   # full suite regression
 
 ### Quick comparison (public builders)
 
-|Function|Operation|Caller provides|Body source|Validation mode|
-|---|---|---|---|---|
-|`build_create_note_proposal`|Create|Full `after_content`|Caller|`CREATE`|
-|`build_create_note_proposal_from_title`|Create|Title + optional metadata overrides|B5 generator|`CREATE`|
-|`build_update_note_proposal`|Update|Full `after_content`|Caller|`UPDATE`|
-|`build_metadata_update_proposal`|Update|`ConceptNoteMetadata` (+ optional `body`)|Vault body preserved, or canonical if missing|`UPDATE`|
+| Function                                | Operation | Caller provides                           | Body source                                   | Validation mode |
+| --------------------------------------- | --------- | ----------------------------------------- | --------------------------------------------- | --------------- |
+| `build_create_note_proposal`            | Create    | Full `after_content`                      | Caller                                        | `CREATE`        |
+| `build_create_note_proposal_from_title` | Create    | Title + optional metadata overrides       | B5 generator                                  | `CREATE`        |
+| `build_update_note_proposal`            | Update    | Full `after_content`                      | Caller                                        | `UPDATE`        |
+| `build_metadata_update_proposal`        | Update    | `ConceptNoteMetadata` (+ optional `body`) | Vault body preserved, or canonical if missing | `UPDATE`        |
