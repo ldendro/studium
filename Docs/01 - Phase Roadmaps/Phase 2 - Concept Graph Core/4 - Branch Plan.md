@@ -91,21 +91,21 @@ Phase 2 recommendations must not directly modify concept-note Markdown.
 
 ## 3. Branch Sequence Overview
 
-|Branch|Name|Main Goal|Key Output|
-|---|---|---|---|
-|01|`P2-B01-schema-v2-amendments`|Amend the Phase 1 storage schema for Phase 2 relationship and source metadata.|Schema-v2 models, fixtures, validation, and compatibility updates.|
-|02|`P2-B02-index-schema-and-repositories`|Establish the persistent SQLite index foundation.|SQLAlchemy Core schema, repositories, database runtime configuration, and index version handling.|
-|03|`P2-B03-vault-index-synchronization`|Synchronize valid vault notes into the derived index.|Incremental sync, full rebuild, selective embedding-change detection, invalid-state handling, and `SyncReport`.|
-|04|`P2-B04-weighted-full-text-search`|Implement deterministic and weighted lexical retrieval.|Exact lookup, materialized search documents, SQLite FTS, and concept/module lexical search.|
-|05|`P2-B05-embedding-pipeline-and-model-selection`|Implement local embedding generation and empirically select the initial model.|Embedding provider, input builders, batching, selective regeneration, benchmark report, and selected model.|
-|06|`P2-B06-vector-search-backend`|Implement and select the vector storage/search backend.|NumPy exact search, SQLite-extension benchmark, selected backend, and vector-search abstraction.|
-|07|`P2-B07-hybrid-retrieval-and-search-contract`|Combine deterministic, lexical, concept-vector, and module-vector retrieval.|Reciprocal rank fusion, execution tiers, `ConceptSearchQuery`, and `ConceptSearchResult`.|
-|08|`P2-B08-graph-and-source-encounter-queries`|Implement graph intelligence and learning-encounter comparison.|One-hop graph queries, inverse relationships, source fingerprints, and encounter outcomes.|
-|09|`P2-B09-llm-provider-and-task-framework`|Establish provider-agnostic structured LLM infrastructure.|Local server adapter, deterministic provider, health checks, task assets, validation, repair, and timeout behavior.|
-|10|`P2-B10-reasoning-tasks-and-model-selection`|Implement concept reasoning tasks and select the initial local LLM.|Identity, new-concept, module, relationship, alias, source ambiguity, and clarification reasoning.|
-|11|`P2-B11-recommendation-models-and-assembly`|Convert retrieval and reasoning evidence into safe recommendations.|Discriminated recommendation models, deterministic assembler, confidence rules, metadata suggestions, fallbacks, and failures.|
-|12|`P2-B12-integrated-evaluation-harness`|Evaluate the complete retrieval and recommendation system.|Curated evaluation set, quality metrics, model/configuration comparison, and approved thresholds.|
-|13|`P2-B13-cli-and-phase-verification`|Expose and verify the complete Phase 2 system.|Final graph CLI, diagnostic outputs, end-to-end verification, and phase completion report.|
+| Branch | Name                                            | Main Goal                                                                      | Key Output                                                                                                                     |
+| ------ | ----------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| 01     | `P2-B01-schema-v2-amendments`                   | Amend the Phase 1 storage schema for Phase 2 relationship and source metadata. | Schema-v2 models, fixtures, validation, and compatibility updates.                                                             |
+| 02     | `P2-B02-index-schema-and-repositories`          | Establish the persistent SQLite index foundation.                              | SQLAlchemy Core schema, repositories, database runtime configuration, and index version handling.                              |
+| 03     | `P2-B03-vault-index-synchronization`            | Synchronize valid vault notes into the derived index.                          | Incremental sync, full rebuild, selective embedding-change detection, invalid-state handling, and `SyncReport`.                |
+| 04     | `P2-B04-weighted-full-text-search`              | Implement deterministic and weighted lexical retrieval.                        | Exact lookup, materialized search documents, SQLite FTS, and concept/module lexical search.                                    |
+| 05     | `P2-B05-embedding-pipeline-and-model-selection` | Implement local embedding generation and empirically select the initial model. | Embedding provider, input builders, batching, selective regeneration, benchmark report, and selected model.                    |
+| 06     | `P2-B06-vector-search-backend`                  | Implement and select the vector storage/search backend.                        | NumPy exact search, SQLite-extension benchmark, selected backend, and vector-search abstraction.                               |
+| 07     | `P2-B07-hybrid-retrieval-and-search-contract`   | Combine deterministic, lexical, concept-vector, and module-vector retrieval.   | Reciprocal rank fusion, execution tiers, `ConceptSearchQuery`, and `ConceptSearchResult`.                                      |
+| 08     | `P2-B08-graph-and-source-encounter-queries`     | Implement graph intelligence and learning-encounter comparison.                | One-hop graph queries, inverse relationships, source fingerprints, and encounter outcomes.                                     |
+| 09     | `P2-B09-llm-provider-and-task-framework`        | Establish provider-agnostic structured LLM infrastructure.                     | Local server adapter, deterministic provider, health checks, task assets, validation, repair, and timeout behavior.            |
+| 10     | `P2-B10-reasoning-tasks-and-model-selection`    | Implement concept reasoning tasks and select the initial local LLM.            | Identity, new-concept, module, relationship, alias, source ambiguity, and clarification reasoning.                             |
+| 11     | `P2-B11-recommendation-models-and-assembly`     | Convert retrieval and reasoning evidence into safe recommendations.            | Discriminated recommendation models, deterministic assembler, confidence rules, metadata suggestions, fallbacks, and failures. |
+| 12     | `P2-B12-integrated-evaluation-harness`          | Evaluate the complete retrieval and recommendation system.                     | Curated evaluation set, quality metrics, model/configuration comparison, and approved thresholds.                              |
+| 13     | `P2-B13-cli-and-phase-verification`             | Expose and verify the complete Phase 2 system.                                 | Final graph CLI, diagnostic outputs, end-to-end verification, and phase completion report.                                     |
 
 ---
 

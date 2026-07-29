@@ -1,13 +1,3 @@
-# Branch: `<branch-name>`
-
-## Branch Summary
-
-**Phase:** `<Phase number and name>`  
-**Branch:** `<branch number and name>`  
-**Status:** `planned | in_progress | implemented | reviewed | merged`
-
----
-
 ## 1. Goal
 
 Describe the purpose of this branch in 2–4 sentences.
