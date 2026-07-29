@@ -27,7 +27,17 @@ def create_engine_for_config(config: IndexConfig) -> Engine:
 
 
 def initialize_index(engine: Engine, config: IndexConfig) -> None:
-    """Create all tables and write the index metadata row."""
+    """Create all tables and write the index metadata row.
+
+    Does not migrate existing DDL. If metadata already records an incompatible
+    schema version, raise and require ``rebuild_index`` instead of rewriting the
+    stored version.
+    """
+    with engine.connect() as connection:
+        found_version = _read_schema_version(connection)
+    if found_version is not None and found_version != INDEX_SCHEMA_VERSION:
+        raise IndexSchemaMismatchError(found=found_version, expected=INDEX_SCHEMA_VERSION)
+
     metadata.create_all(engine)
     now = _utc_now_iso()
     with begin_connection(engine) as connection:
@@ -48,7 +58,6 @@ def initialize_index(engine: Engine, config: IndexConfig) -> None:
                 index_metadata.update()
                 .where(index_metadata.c.id == existing.id)
                 .values(
-                    schema_version=INDEX_SCHEMA_VERSION,
                     vault_path=str(config.resolved_vault_root),
                     vault_identifier=config.vault_identifier,
                     updated_at=now,
@@ -91,8 +100,20 @@ def delete_index_files(db_path: Path) -> None:
             path.unlink()
 
 
-def rebuild_index(config: IndexConfig) -> Engine:
-    """Delete the existing index database and recreate it from scratch."""
+def rebuild_index(
+    config: IndexConfig,
+    existing_engine: Engine | None = None,
+) -> Engine:
+    """Delete the existing index database and recreate it from scratch.
+
+    Pass any engine previously opened against this database as
+    ``existing_engine`` so its connection pool is closed before the SQLite
+    files are unlinked. Leaving pooled handles open can fail on Windows
+    (file in use) or leave POSIX connections attached to a deleted inode.
+    """
+    if existing_engine is not None:
+        existing_engine.dispose()
+
     db_path = config.database_path
     delete_index_files(db_path)
     engine = create_engine_for_config(config)
