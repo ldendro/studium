@@ -13,6 +13,10 @@ from studium.schemas.enums import ValidationOperation
 from studium.validation import parse_and_validate
 
 
+def _empty_reasons() -> list[str]:
+    return []
+
+
 @dataclass(slots=True)
 class FileAnalysis:
     path: str
@@ -23,7 +27,7 @@ class FileAnalysis:
     parsed: ParsedConceptNote | None = None
     validation: ValidationResult | None = None
     moved_from: str | None = None
-    reasons: list[str] = field(default_factory=list[str])
+    reasons: list[str] = field(default_factory=_empty_reasons)
 
 
 def analyze_vault_files(

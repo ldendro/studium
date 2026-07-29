@@ -54,6 +54,14 @@ class SyncCounts(BaseModel):
     duplicate_conflicts: int = 0
 
 
+def _empty_embedding_work() -> list[EmbeddingWorkRequest]:
+    return []
+
+
+def _empty_strings() -> list[str]:
+    return []
+
+
 class SyncReport(BaseModel):
     """Outcome of ``sync_vault`` / ``rebuild_vault_index``."""
 
@@ -66,6 +74,6 @@ class SyncReport(BaseModel):
     revision_before: int
     revision_after: int
     counts: SyncCounts = Field(default_factory=SyncCounts)
-    embedding_work: list[EmbeddingWorkRequest] = Field(default_factory=list[EmbeddingWorkRequest])
-    warnings: list[str] = Field(default_factory=list[str])
-    errors: list[str] = Field(default_factory=list[str])
+    embedding_work: list[EmbeddingWorkRequest] = Field(default_factory=_empty_embedding_work)
+    warnings: list[str] = Field(default_factory=_empty_strings)
+    errors: list[str] = Field(default_factory=_empty_strings)
