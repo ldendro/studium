@@ -73,6 +73,12 @@ Application data defaults to the OS user data directory for `studium`
 versioned independently from concept-note `schema_version`; incompatible indexes
 must be rebuilt rather than migrated.
 
+Library entrypoints:
+
+- `studium.index.sync_vault(vault, engine, config)` — incremental vault → index sync
+- `studium.index.rebuild_vault_index(vault, config, existing_engine=...)` — dispose,
+  recreate empty schema, full sync
+
 ## Project structure
 
 ```
@@ -84,7 +90,7 @@ src/studium/
   validation/     # critical-error / warning validation (P1-B6)
   writes/         # safe write proposals + vault writes (P1-B7)
   cli/            # minimal CLI (P1-B8)
-  index/          # SQLite derived index + repositories (P2-B02)
+  index/          # SQLite derived index, repositories, vault sync (P2-B02/B03)
 tests/            # pytest test suite
 ```
 

@@ -27,3 +27,17 @@ def get_indexed_file(connection: Connection, file_path: str) -> dict[str, Any] |
 
 def delete_indexed_file(connection: Connection, file_path: str) -> None:
     connection.execute(delete(indexed_files).where(indexed_files.c.file_path == file_path))
+
+
+def list_indexed_files(connection: Connection) -> list[dict[str, Any]]:
+    rows = connection.execute(select(indexed_files).order_by(indexed_files.c.file_path)).all()
+    return [mapping(row) for row in rows]
+
+
+def list_indexed_files_for_concept(connection: Connection, concept_id: str) -> list[dict[str, Any]]:
+    rows = connection.execute(
+        select(indexed_files)
+        .where(indexed_files.c.concept_id == concept_id)
+        .order_by(indexed_files.c.file_path)
+    ).all()
+    return [mapping(row) for row in rows]

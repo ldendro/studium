@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B01-schema-v2-amendments.md",
+                "file": "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B03-vault-index-synchronization.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "P2-B01-schema-v2-amendments"
+              "title": "P2-B03-vault-index-synchronization"
             }
           },
           {
@@ -27,16 +27,15 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B02-index-schema-and-repositories.md",
+                "file": "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B01-schema-v2-amendments.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "P2-B02-index-schema-and-repositories"
+              "title": "P2-B01-schema-v2-amendments"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       },
       {
         "id": "1a5777a6aeb807c9",
@@ -218,14 +217,15 @@
       "bases:Create new base": false
     }
   },
-  "active": "aa32b2940d5e40ef",
+  "active": "ab327e63fe3d023e",
   "lastOpenFiles": [
+    "99 - Archive/Branch - Template.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B03-vault-index-synchronization.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/4 - Branch Plan.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B02-index-schema-and-repositories.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B01-schema-v2-amendments.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B4-markdown-frontmatter-parser.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B5-concept-note-serialization.md",
-    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B02-index-schema-and-repositories.md",
-    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/4 - Branch Plan.md",
-    "99 - Archive/Branch - Template.md",
-    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B01-schema-v2-amendments.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/3 - Technical Plan.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/3 - Technical Plan.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B1-core-package-foundation.md",
@@ -247,7 +247,6 @@
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches",
     "99 - Archive/Technical Plan - Template.md",
     "99 - Archive/Phase Roadmap - Template.md",
-    "01 - Phase Roadmaps/Phase 4 - Create/00 Create Roadmap.md",
     "99 - Archive/Software Development Workflow Infographic.png",
     "Untitled.canvas",
     "10 - Concepts",
