@@ -218,12 +218,7 @@ def _apply_analysis(
             encounter_rows=projection.encounter_rows,
             relationship_rows=projection.relationship_rows,
             module_rows=projection.module_rows,
-            concept_search_document={
-                "concept_id": projection.concept_id,
-                "document_text": projection.concept_search_document_text,
-                "field_weights_json": None,
-                "indexed_revision": pending_revision,
-            },
+            concept_search_document=projection.concept_search_document,
             module_search_documents=projection.module_search_documents,
             indexed_file=indexed_file_row_for_projection(
                 projection,

@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+import json
+from typing import Any, cast
 
 from sqlalchemy.engine import Connection
 
+from studium.index.normalize import dedupe_aliases_by_normalized
 from studium.index.repositories import aliases as aliases_repo
 from studium.index.repositories import concepts as concepts_repo
 from studium.index.repositories import domains as domains_repo
+from studium.index.repositories import fts as fts_repo
 from studium.index.repositories import indexed_files as indexed_files_repo
 from studium.index.repositories import invalid_records as invalid_records_repo
 from studium.index.repositories import learning_encounters as learning_encounters_repo
@@ -18,7 +21,8 @@ from studium.index.repositories import search_documents as search_documents_repo
 
 
 def remove_concept_projection(connection: Connection, concept_id: str) -> None:
-    """Delete a concept and all cascaded derived child rows."""
+    """Delete a concept, cascaded children, and FTS rows."""
+    fts_repo.delete_all_fts_for_concept(connection, concept_id)
     concepts_repo.delete_concept(connection, concept_id)
 
 
@@ -49,7 +53,9 @@ def upsert_concept_projection(
     search_documents_repo.delete_concept_search_document(connection, concept_id)
 
     concepts_repo.upsert_concept(connection, concept)
-    for alias in alias_values:
+    # Hyphen/underscore variants normalize to the same key; keep one row each.
+    unique_aliases = dedupe_aliases_by_normalized(alias_values)
+    for alias in unique_aliases:
         aliases_repo.insert_alias(connection, concept_id=concept_id, alias=alias)
     for domain in domain_values:
         domains_repo.insert_domain(connection, concept_id=concept_id, domain=domain)
@@ -62,6 +68,30 @@ def upsert_concept_projection(
     search_documents_repo.upsert_concept_search_document(connection, concept_search_document)
     for module_doc in module_search_documents:
         search_documents_repo.upsert_module_search_document(connection, module_doc)
+
+    overview = ""
+    fields_raw = concept_search_document.get("field_weights_json")
+    if isinstance(fields_raw, str) and fields_raw:
+        try:
+            parsed_fields: object = json.loads(fields_raw)
+        except json.JSONDecodeError:
+            parsed_fields = None
+        if isinstance(parsed_fields, dict):
+            typed_fields = cast(dict[str, object], parsed_fields)
+            overview_value = typed_fields.get("overview")
+            overview = "" if overview_value is None else str(overview_value)
+
+    # One FTS replace at end (delete + inserts); pass deduped aliases so BM25
+    # does not count formatting variants as repeated terms.
+    fts_repo.sync_concept_projection_fts(
+        connection,
+        concept_id=concept_id,
+        title=str(concept["canonical_title"]),
+        aliases=unique_aliases,
+        domains=domain_values,
+        overview=overview,
+        module_rows=module_rows,
+    )
 
     indexed_files_repo.upsert_indexed_file(connection, indexed_file)
     invalid_records_repo.delete_invalid_records_for_path(connection, str(indexed_file["file_path"]))

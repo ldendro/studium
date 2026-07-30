@@ -78,7 +78,12 @@ Library entrypoints:
 - `studium.index.sync_vault(vault, engine, config)` — incremental vault → index sync
 - `studium.index.rebuild_vault_index(vault, config, existing_engine=...)` — dispose,
   recreate empty schema, full sync
+- `studium.index.resolve_concept_identity(engine, query)` — deterministic ID / title /
+  alias lookup (no FTS)
+- `studium.index.search_concepts_fts` / `search_modules_fts` — weighted BM25 over FTS5
+- `studium.index.search_concepts_lexical(engine, query)` — lookup first, then FTS
 
+Lexical search is library-only in this phase (no CLI). Hybrid / vector fusion comes later.
 ## Project structure
 
 ```
@@ -90,7 +95,7 @@ src/studium/
   validation/     # critical-error / warning validation (P1-B6)
   writes/         # safe write proposals + vault writes (P1-B7)
   cli/            # minimal CLI (P1-B8)
-  index/          # SQLite derived index, repositories, vault sync (P2-B02/B03)
+  index/          # SQLite derived index, sync, lexical search (P2-B02–B04)
 tests/            # pytest test suite
 ```
 

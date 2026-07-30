@@ -11,6 +11,7 @@ from sqlalchemy.engine import Connection
 from studium.index.config import INDEX_SCHEMA_VERSION, IndexConfig
 from studium.index.engine import begin_connection, create_index_engine
 from studium.index.errors import IndexNotInitializedError, IndexSchemaMismatchError
+from studium.index.repositories.fts import clear_fts_tables, create_fts_tables
 from studium.index.schema import index_metadata, metadata
 
 
@@ -41,6 +42,7 @@ def initialize_index(engine: Engine, config: IndexConfig) -> None:
     metadata.create_all(engine)
     now = _utc_now_iso()
     with begin_connection(engine) as connection:
+        create_fts_tables(connection)
         existing = connection.execute(select(index_metadata.c.id).limit(1)).first()
         if existing is None:
             connection.execute(
@@ -146,8 +148,13 @@ def set_schema_version_for_tests(engine: Engine, version: int) -> None:
 
 
 def clear_all_tables(engine: Engine) -> None:
-    """Delete all rows from application tables (keeps schema)."""
+    """Delete all rows from application tables (keeps schema).
+
+    FTS5 virtual tables are outside SQLAlchemy metadata, so they are cleared
+    explicitly; otherwise lexical search would keep stale hits after a reset.
+    """
     with begin_connection(engine) as connection:
+        clear_fts_tables(connection)
         for table in reversed(metadata.sorted_tables):
             connection.execute(delete(table))
 
