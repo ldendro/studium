@@ -11,7 +11,7 @@ from studium.index.paths import (
     resolve_application_data_dir,
 )
 
-INDEX_SCHEMA_VERSION = 2
+INDEX_SCHEMA_VERSION = 3
 DEFAULT_BUSY_TIMEOUT_MS = 5000
 
 

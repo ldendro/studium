@@ -38,5 +38,16 @@ def list_aliases_for_concept(connection: Connection, concept_id: str) -> list[di
     return [mapping(row) for row in rows]
 
 
+def list_aliases_by_normalized_alias(
+    connection: Connection, normalized_alias: str
+) -> list[dict[str, Any]]:
+    rows = connection.execute(
+        select(concept_aliases)
+        .where(concept_aliases.c.normalized_alias == normalized_alias)
+        .order_by(concept_aliases.c.concept_id, concept_aliases.c.id)
+    ).all()
+    return [mapping(row) for row in rows]
+
+
 def delete_aliases_for_concept(connection: Connection, concept_id: str) -> None:
     connection.execute(delete(concept_aliases).where(concept_aliases.c.concept_id == concept_id))

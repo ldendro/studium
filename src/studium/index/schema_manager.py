@@ -11,6 +11,7 @@ from sqlalchemy.engine import Connection
 from studium.index.config import INDEX_SCHEMA_VERSION, IndexConfig
 from studium.index.engine import begin_connection, create_index_engine
 from studium.index.errors import IndexNotInitializedError, IndexSchemaMismatchError
+from studium.index.repositories.fts import create_fts_tables
 from studium.index.schema import index_metadata, metadata
 
 
@@ -41,6 +42,7 @@ def initialize_index(engine: Engine, config: IndexConfig) -> None:
     metadata.create_all(engine)
     now = _utc_now_iso()
     with begin_connection(engine) as connection:
+        create_fts_tables(connection)
         existing = connection.execute(select(index_metadata.c.id).limit(1)).first()
         if existing is None:
             connection.execute(

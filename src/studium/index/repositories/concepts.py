@@ -27,6 +27,17 @@ def get_concept(connection: Connection, concept_id: str) -> dict[str, Any] | Non
     return None if row is None else mapping(row)
 
 
+def list_concepts_by_normalized_title(
+    connection: Connection, normalized_title: str
+) -> list[dict[str, Any]]:
+    rows = connection.execute(
+        select(concepts)
+        .where(concepts.c.normalized_title == normalized_title)
+        .order_by(concepts.c.concept_id)
+    ).all()
+    return [mapping(row) for row in rows]
+
+
 def delete_concept(connection: Connection, concept_id: str) -> None:
     connection.execute(delete(concepts).where(concepts.c.concept_id == concept_id))
 

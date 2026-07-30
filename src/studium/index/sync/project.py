@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -38,7 +39,7 @@ class ConceptProjection:
     relationship_rows: list[dict[str, Any]]
     module_rows: list[dict[str, Any]]
     module_inputs: list[tuple[str, str, str]]  # module_id, input_text, input_hash
-    concept_search_document_text: str
+    concept_search_document: dict[str, Any]
     module_search_documents: list[dict[str, Any]]
     hash_payload: dict[str, Any]
 
@@ -105,9 +106,21 @@ def project_concept_note(
             }
         )
 
+    concept_fields = {
+        "title": metadata.canonical_title,
+        "aliases": " ".join(alias_values),
+        "domains": " ".join(domain_values),
+        "overview": overview_plaintext,
+    }
     concept_search_text = _concept_search_text(
-        metadata.canonical_title, alias_values, overview_plaintext
+        metadata.canonical_title, alias_values, overview_plaintext, domain_values
     )
+    concept_search_document = {
+        "concept_id": concept_id,
+        "document_text": concept_search_text,
+        "field_weights_json": json.dumps(concept_fields, sort_keys=True, ensure_ascii=False),
+        "indexed_revision": indexed_revision,
+    }
     concept_row = {
         "concept_id": concept_id,
         "canonical_title": metadata.canonical_title,
@@ -146,7 +159,7 @@ def project_concept_note(
             }
             for row in module_rows
         ],
-        "concept_search_document": concept_search_text,
+        "concept_search_document": concept_fields,
         "module_search_documents": [
             {"module_id": doc["module_id"], "document_text": doc["document_text"]}
             for doc in module_search_documents
@@ -176,7 +189,7 @@ def project_concept_note(
         relationship_rows=relationship_rows,
         module_rows=module_rows,
         module_inputs=module_inputs,
-        concept_search_document_text=concept_search_text,
+        concept_search_document=concept_search_document,
         module_search_documents=module_search_documents,
         hash_payload=hash_payload,
     )
@@ -204,8 +217,8 @@ def indexed_file_row_for_projection(
     }
 
 
-def _concept_search_text(title: str, aliases: list[str], overview: str) -> str:
-    parts = [title, *aliases]
+def _concept_search_text(title: str, aliases: list[str], overview: str, domains: list[str]) -> str:
+    parts = [title, *aliases, *domains]
     if overview:
         parts.append(overview)
     return " ".join(parts)
