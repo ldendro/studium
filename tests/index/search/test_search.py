@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,9 @@ from studium.index import (
 )
 from studium.index.config import IndexConfig
 from studium.index.repositories import fts
+from studium.index.schema_manager import clear_all_tables
+from studium.index.search.fts import build_fts_match_query
+from studium.index.search.fts_tokenize import tokenize_fts_text
 from studium.index.search.weights import CONCEPT_FTS_WEIGHTS, MODULE_FTS_WEIGHTS
 from studium.vault import Vault
 from tests.index.sync.helpers import write_concept_note
@@ -239,8 +243,13 @@ def test_alias_hyphen_underscore_variants_do_not_break_sync(
             text("SELECT aliases FROM concept_fts WHERE concept_id = :cid"),
             {"cid": "concept_var_eeeeee"},
         ).scalar_one()
-    # Only the first display form is indexed (no duplicate token inflation).
+        fields_raw = connection.execute(
+            text("SELECT field_weights_json FROM concept_search_documents WHERE concept_id = :cid"),
+            {"cid": "concept_var_eeeeee"},
+        ).scalar_one()
+    # Materialized fields and FTS must share the same deduped alias text.
     assert aliases_text == "foo-bar"
+    assert json.loads(str(fields_raw))["aliases"] == "foo-bar"
 
 
 def test_fts_tie_break_is_stable_by_concept_id(
@@ -279,6 +288,80 @@ def test_bm25_weight_tuples_include_unindexed_placeholders() -> None:
     assert CONCEPT_FTS_WEIGHTS[1:] == (10.0, 8.0, 2.0, 4.0)
     assert MODULE_FTS_WEIGHTS[:2] == (0.0, 0.0)
     assert MODULE_FTS_WEIGHTS[2:] == (8.0, 2.0, 3.0, 1.0)
+
+
+def test_fts_match_query_splits_underscores_like_hyphens() -> None:
+    assert build_fts_match_query("foo_bar") == '"foo" "bar"'
+    assert build_fts_match_query("foo-bar") == '"foo" "bar"'
+
+
+def test_matched_fields_use_fts_token_boundaries() -> None:
+    # Diagnostics use whole-token intersection (same rules as MATCH), not substrings.
+    assert "net" not in set(tokenize_fts_text("Internet"))
+    assert set(tokenize_fts_text("internet")) & set(tokenize_fts_text("Internet"))
+    assert set(tokenize_fts_text("cafe")) & set(tokenize_fts_text("café culture"))
+    assert tokenize_fts_text("café") == ["cafe"]
+
+
+def test_underscore_query_matches_nonadjacent_terms(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(
+        vault_root,
+        "concepts/nonadj.md",
+        id="concept_nonadj_hhhhhh",
+        canonical_title="Other Title",
+        overview="foo appears then later bar in overview.",
+    )
+    sync_vault(vault, initialized_engine, index_config)
+    hits = search_concepts_fts(initialized_engine, "foo_bar")
+    assert hits
+    assert hits[0].concept_id == "concept_nonadj_hhhhhh"
+
+
+def test_matched_fields_cafe_credits_accented_overview(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(
+        vault_root,
+        "concepts/cafe.md",
+        id="concept_cafe_iiiiii",
+        canonical_title="Internet",
+        overview="notes about café culture",
+    )
+    sync_vault(vault, initialized_engine, index_config)
+    hits = search_concepts_fts(initialized_engine, "cafe")
+    assert hits
+    assert hits[0].matched_fields == ["overview"]
+
+
+def test_clear_all_tables_also_clears_fts(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(
+        vault_root,
+        "concepts/stale.md",
+        id="concept_stale_gggggg",
+        canonical_title="StaleConcept",
+        overview="staleoverviewtoken",
+    )
+    sync_vault(vault, initialized_engine, index_config)
+    assert search_concepts_fts(initialized_engine, "staleoverviewtoken")
+
+    clear_all_tables(initialized_engine)
+    assert search_concepts_fts(initialized_engine, "staleoverviewtoken") == []
+    with begin_connection(initialized_engine) as connection:
+        assert connection.execute(text("SELECT count(*) FROM concept_fts")).scalar_one() == 0
+        assert connection.execute(text("SELECT count(*) FROM module_fts")).scalar_one() == 0
 
 
 def test_fts_tables_created_on_initialize(initialized_engine: Engine) -> None:

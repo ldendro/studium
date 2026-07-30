@@ -2,25 +2,23 @@
 
 from __future__ import annotations
 
-import re
-
 from sqlalchemy import Engine, text
 
 from studium.index.repositories import concepts, domains, scaffold_modules
 from studium.index.repositories.fts import CONCEPT_FTS_TABLE, MODULE_FTS_TABLE
+from studium.index.search.fts_tokenize import tokenize_fts_text
 from studium.index.search.models import LexicalConceptHit, LexicalModuleHit
 from studium.index.search.weights import CONCEPT_FTS_WEIGHTS, MODULE_FTS_WEIGHTS
 
-_TOKEN_SPLIT = re.compile(r"[^\w]+", re.UNICODE)
-
 
 def build_fts_match_query(query_text: str) -> str | None:
-    """Convert user text into a safe FTS5 MATCH expression (AND of quoted tokens)."""
+    """Convert user text into a safe FTS5 MATCH expression (AND of quoted tokens).
+
+    Tokens follow ``tokenize_fts_text`` so ``foo_bar`` becomes ``"foo" "bar"``
+    (AND), matching unicode61 — not the quoted phrase ``"foo_bar"``.
+    """
     tokens: list[str] = []
-    for part in _TOKEN_SPLIT.split(query_text):
-        token = part.strip()
-        if not token:
-            continue
+    for token in tokenize_fts_text(query_text):
         # Escape embedded double quotes for FTS5 phrase/token quoting.
         escaped = token.replace('"', '""')
         tokens.append(f'"{escaped}"')
@@ -164,13 +162,13 @@ def _matched_module_fields(query_text: str, row: object) -> list[str]:
 
 
 def _fields_containing_tokens(query_text: str, fields: dict[str, str]) -> list[str]:
-    tokens = [part.casefold() for part in _TOKEN_SPLIT.split(query_text) if part.strip()]
-    if not tokens:
+    query_tokens = set(tokenize_fts_text(query_text))
+    if not query_tokens:
         return []
     matched: list[str] = []
     for name, value in fields.items():
-        haystack = value.casefold()
-        if any(token in haystack for token in tokens):
+        field_tokens = set(tokenize_fts_text(value))
+        if query_tokens & field_tokens:
             matched.append(name)
     return matched
 

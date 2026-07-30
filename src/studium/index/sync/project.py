@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from studium.index.normalize import dedupe_aliases_by_normalized
 from studium.index.sync.embedding_inputs import (
     identity_input_from_metadata,
     module_input_from_metadata,
@@ -64,7 +65,8 @@ def project_concept_note(
     semantic_input_hash = hash_text(semantic_input)
 
     concept_id = metadata.id
-    alias_values = list(metadata.aliases)
+    # Same normalized forms as concept_aliases / FTS (foo-bar ≡ foo_bar).
+    alias_values = dedupe_aliases_by_normalized(list(metadata.aliases))
     domain_values = list(metadata.concept_domains)
 
     encounter_rows = [

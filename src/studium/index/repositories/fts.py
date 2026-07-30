@@ -9,7 +9,8 @@ from sqlalchemy.engine import Connection
 
 # FTS tokenizer lives here (not in search.weights) to avoid importing the search
 # package from repositories — that cycle broke package import.
-FTS_TOKENIZER = "unicode61"
+# remove_diacritics 1 keeps café/cafe aligned with Python tokenize_fts_text.
+FTS_TOKENIZER = "unicode61 remove_diacritics 1"
 
 CONCEPT_FTS_TABLE = "concept_fts"
 MODULE_FTS_TABLE = "module_fts"
@@ -42,6 +43,12 @@ def create_fts_tables(connection: Connection) -> None:
     """Create concept and module FTS5 virtual tables if missing."""
     connection.execute(text(_CREATE_CONCEPT_FTS))
     connection.execute(text(_CREATE_MODULE_FTS))
+
+
+def clear_fts_tables(connection: Connection) -> None:
+    """Delete all rows from FTS virtual tables (keeps table definitions)."""
+    connection.execute(text(f"DELETE FROM {CONCEPT_FTS_TABLE}"))
+    connection.execute(text(f"DELETE FROM {MODULE_FTS_TABLE}"))
 
 
 def delete_concept_fts(connection: Connection, concept_id: str) -> None:
