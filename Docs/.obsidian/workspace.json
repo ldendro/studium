@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B03-vault-index-synchronization.md",
+                "file": "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B04-weighted-full-text-search.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "P2-B03-vault-index-synchronization"
+              "title": "P2-B04-weighted-full-text-search"
             }
           },
           {
@@ -219,9 +219,10 @@
   },
   "active": "ab327e63fe3d023e",
   "lastOpenFiles": [
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/4 - Branch Plan.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B04-weighted-full-text-search.md",
     "99 - Archive/Branch - Template.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B03-vault-index-synchronization.md",
-    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/4 - Branch Plan.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B02-index-schema-and-repositories.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B01-schema-v2-amendments.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B4-markdown-frontmatter-parser.md",
@@ -246,7 +247,6 @@
     "99 - Archive/Example Structure.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches",
     "99 - Archive/Technical Plan - Template.md",
-    "99 - Archive/Phase Roadmap - Template.md",
     "99 - Archive/Software Development Workflow Infographic.png",
     "Untitled.canvas",
     "10 - Concepts",

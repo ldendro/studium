@@ -96,8 +96,8 @@ def sync_vault(vault: Vault, engine: Engine, config: IndexConfig) -> SyncReport:
             }:
                 warnings.extend(analysis.reasons)
         except Exception as exc:
+            # Processing failures are reported in errors, not as validation invalids.
             errors.append(f"{analysis.path}: {exc}")
-            counts.invalid += 1
 
     revision_after = revision_before
     if usable_state_changed:

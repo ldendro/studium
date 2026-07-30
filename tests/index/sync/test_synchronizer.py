@@ -273,10 +273,11 @@ def test_atomic_rollback_leaves_no_partial_children(
     monkeypatch.setattr(projections, "upsert_concept_projection", _boom)
     report = sync_vault(vault, initialized_engine, index_config)
     assert report.errors
+    assert report.status == SyncStatus.FAILED
     assert report.counts.created == 0
     assert report.counts.updated == 0
     assert report.counts.moved == 0
-    assert report.counts.invalid == 1
+    assert report.counts.invalid == 0
     with begin_connection(initialized_engine) as connection:
         assert concepts.get_concept(connection, "concept_atom_001") is None
 
