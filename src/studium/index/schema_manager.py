@@ -48,6 +48,7 @@ def initialize_index(engine: Engine, config: IndexConfig) -> None:
                     schema_version=INDEX_SCHEMA_VERSION,
                     vault_path=str(config.resolved_vault_root),
                     vault_identifier=config.vault_identifier,
+                    index_revision=0,
                     created_at=now,
                     updated_at=now,
                     last_rebuild_at=None,
@@ -149,3 +150,32 @@ def clear_all_tables(engine: Engine) -> None:
     with begin_connection(engine) as connection:
         for table in reversed(metadata.sorted_tables):
             connection.execute(delete(table))
+
+
+def get_index_revision(engine: Engine) -> int:
+    """Return the current index revision, or raise if metadata is missing."""
+    with engine.connect() as connection:
+        row = connection.execute(
+            select(index_metadata.c.index_revision).order_by(index_metadata.c.id).limit(1)
+        ).first()
+    if row is None:
+        raise IndexNotInitializedError("Index metadata is missing; initialize or rebuild.")
+    return int(row.index_revision)
+
+
+def increment_index_revision(engine: Engine) -> int:
+    """Bump index_revision by one and return the new value."""
+    now = _utc_now_iso()
+    with begin_connection(engine) as connection:
+        meta = connection.execute(
+            select(index_metadata).order_by(index_metadata.c.id).limit(1)
+        ).first()
+        if meta is None:
+            raise IndexNotInitializedError("Index metadata is missing; initialize or rebuild.")
+        new_revision = int(meta.index_revision) + 1
+        connection.execute(
+            index_metadata.update()
+            .where(index_metadata.c.id == meta.id)
+            .values(index_revision=new_revision, updated_at=now)
+        )
+    return new_revision

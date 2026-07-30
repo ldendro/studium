@@ -1,53 +1,12 @@
 ## 1. Goal
 
-Describe the purpose of this branch in 2–4 sentences.
-
-This branch exists to:
-
-At the end of this branch, the system should be able to:
+The purpose of this branch is to implement the sparse retrieval aspect of the overall retrieval system, including implementing deterministic and weighted lexical retrieval of note content based on user query. This branch includes the use of weighted SQLite full-text retrieval for concepts and scaffolds modules, which will be reviewed up for further understanding in this document. 
 
 ---
 
 ## 2. Branch Context
 
-This section should be written before Cursor creates the detailed implementation plan.
-
-### Main System Area
-
-This branch primarily affects:
-
--  Vault storage
-    
--  Markdown parsing
-    
--  Data schemas
-    
--  Concept graph
-    
--  Search
-    
--  Create workflow
-    
--  Source intelligence
-    
--  Agent behavior
-    
--  UI / UX
-    
--  Testing infrastructure
-    
--  Developer tooling
-    
--  Other:
-    
-
-### Branch Dependencies
-
-This branch depends on:
-
-### Risks / Things to Watch
-
-Potential issues, tradeoffs, or fragile areas:
+- Mainly involves the sparse retrieval side of the overall retrieval system, so exact ID lookup, normalized title lookup, approved-alias lookup, keyword search, concept overview search, concept-domain search, and scaffold module lexical search. 
 
 ---
 
@@ -78,18 +37,18 @@ Do not implement code yet.
 Project context:
 Studium is an AI-assisted learning system built around Markdown/Obsidian-compatible notes, concept graphs, scaffold generation, source-aware RAG, local/source library processing, and agent-based note review.
 
-Phase:
+Phase: 2
 
-Branch:
+Branch: Weighted Full Text Search
 
 Branch goal:
-<branch goal>
+Implement determinstic concept identiy lookup and weighted SQLite full-text retrieval for concepts and scaffold modules to not only incorporate as part of the entire retrieval system but to also utilize as a baseline when implementing the embedding pipeline for retrieval in later branches.
 
 Expected outcome:
-<what the system should be able to do after this branch>
+The sparse retrieval side of the retreival system is fully functional, where exact IDs, titles, and approved aliases resolve deterministically. 
 
 Relevant context:
-<briefly paste or summarize relevant details from the Phase Roadmap, Technical Plan, Branch Plan, schemas, system models, or prior branches>
+Within the Phase 2 - Concept Graph Core folder, the fiels 2- Final Phase Roadmap, 3 - Technical Plan, and 4 - Branch Plan. 
 
 Known constraints:
 - Keep implementation scoped to this branch.

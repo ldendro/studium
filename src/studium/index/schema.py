@@ -25,6 +25,7 @@ index_metadata = Table(
     Column("schema_version", Integer, nullable=False),
     Column("vault_path", Text, nullable=False),
     Column("vault_identifier", String(64), nullable=False),
+    Column("index_revision", Integer, nullable=False, server_default="0"),
     Column("created_at", Text, nullable=False),
     Column("updated_at", Text, nullable=False),
     Column("last_rebuild_at", Text, nullable=True),
@@ -162,6 +163,7 @@ scaffold_modules = Table(
     Column("heading", Text, nullable=True),
     Column("anchor", Text, nullable=True),
     Column("segment_count", Integer, nullable=False, server_default="1"),
+    Column("module_input_hash", String(128), nullable=True),
     Column("indexed_revision", Integer, nullable=False),
 )
 

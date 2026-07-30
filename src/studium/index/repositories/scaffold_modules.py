@@ -40,3 +40,7 @@ def list_modules_for_concept(connection: Connection, concept_id: str) -> list[di
 
 def delete_scaffold_module(connection: Connection, module_id: str) -> None:
     connection.execute(delete(scaffold_modules).where(scaffold_modules.c.module_id == module_id))
+
+
+def delete_modules_for_concept(connection: Connection, concept_id: str) -> None:
+    connection.execute(delete(scaffold_modules).where(scaffold_modules.c.concept_id == concept_id))
