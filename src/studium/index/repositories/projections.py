@@ -45,7 +45,6 @@ def upsert_concept_projection(
     concept are deleted and re-inserted so projection stays deterministic.
     """
     concept_id = str(concept["concept_id"])
-    fts_repo.delete_all_fts_for_concept(connection, concept_id)
     aliases_repo.delete_aliases_for_concept(connection, concept_id)
     domains_repo.delete_domains_for_concept(connection, concept_id)
     learning_encounters_repo.delete_encounters_for_concept(connection, concept_id)
@@ -82,11 +81,13 @@ def upsert_concept_projection(
             overview_value = typed_fields.get("overview")
             overview = "" if overview_value is None else str(overview_value)
 
+    # One FTS replace at end (delete + inserts); pass deduped aliases so BM25
+    # does not count formatting variants as repeated terms.
     fts_repo.sync_concept_projection_fts(
         connection,
         concept_id=concept_id,
         title=str(concept["canonical_title"]),
-        aliases=alias_values,
+        aliases=unique_aliases,
         domains=domain_values,
         overview=overview,
         module_rows=module_rows,

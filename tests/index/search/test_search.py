@@ -234,6 +234,14 @@ def test_alias_hyphen_underscore_variants_do_not_break_sync(
     assert resolution.unique_match is not None
     assert resolution.unique_match.concept_id == "concept_var_eeeeee"
 
+    with begin_connection(initialized_engine) as connection:
+        aliases_text = connection.execute(
+            text("SELECT aliases FROM concept_fts WHERE concept_id = :cid"),
+            {"cid": "concept_var_eeeeee"},
+        ).scalar_one()
+    # Only the first display form is indexed (no duplicate token inflation).
+    assert aliases_text == "foo-bar"
+
 
 def test_fts_tie_break_is_stable_by_concept_id(
     vault: Vault,

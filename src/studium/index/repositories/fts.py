@@ -59,11 +59,12 @@ def delete_module_fts_for_concept(connection: Connection, concept_id: str) -> No
 
 
 def delete_all_fts_for_concept(connection: Connection, concept_id: str) -> None:
+    """Remove concept + module FTS rows for one concept (two scans max)."""
     delete_concept_fts(connection, concept_id)
     delete_module_fts_for_concept(connection, concept_id)
 
 
-def upsert_concept_fts(
+def insert_concept_fts(
     connection: Connection,
     *,
     concept_id: str,
@@ -72,7 +73,7 @@ def upsert_concept_fts(
     domains: str,
     overview: str,
 ) -> None:
-    delete_concept_fts(connection, concept_id)
+    """Insert one concept FTS row. Caller must have deleted any prior row."""
     connection.execute(
         text(
             f"""
@@ -92,7 +93,7 @@ def upsert_concept_fts(
     )
 
 
-def upsert_module_fts(
+def insert_module_fts(
     connection: Connection,
     *,
     module_id: str,
@@ -102,10 +103,7 @@ def upsert_module_fts(
     focus: str,
     body: str,
 ) -> None:
-    connection.execute(
-        text(f"DELETE FROM {MODULE_FTS_TABLE} WHERE module_id = :module_id"),
-        {"module_id": module_id},
-    )
+    """Insert one module FTS row. Caller must have deleted any prior rows."""
     connection.execute(
         text(
             f"""
@@ -136,9 +134,14 @@ def sync_concept_projection_fts(
     overview: str,
     module_rows: list[dict[str, Any]],
 ) -> None:
-    """Replace FTS rows for one concept and its modules."""
+    """Replace FTS rows for one concept and its modules.
+
+    Performs a single concept-scoped delete pair, then inserts. Identifier
+    columns are UNINDEXED, so each ``DELETE ... WHERE id = ...`` scans the
+    virtual table — avoid per-row deletes during rebuild.
+    """
     delete_all_fts_for_concept(connection, concept_id)
-    upsert_concept_fts(
+    insert_concept_fts(
         connection,
         concept_id=concept_id,
         title=title,
@@ -147,7 +150,7 @@ def sync_concept_projection_fts(
         overview=overview,
     )
     for module in module_rows:
-        upsert_module_fts(
+        insert_module_fts(
             connection,
             module_id=str(module["module_id"]),
             concept_id=concept_id,
