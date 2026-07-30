@@ -6,7 +6,7 @@ The purpose of this branch is to implement the sparse retrieval aspect of the ov
 
 ## 2. Branch Context
 
-- Mainly involves the sparse retrieval side of the overall retrieval system, involving Text Normalization to properly compare texts, 
+- Mainly involves the sparse retrieval side of the overall retrieval system, so exact ID lookup, normalized title lookup, approved-alias lookup, keyword search, concept overview search, concept-domain search, and scaffold module lexical search. 
 
 ---
 
@@ -37,15 +37,15 @@ Do not implement code yet.
 Project context:
 Studium is an AI-assisted learning system built around Markdown/Obsidian-compatible notes, concept graphs, scaffold generation, source-aware RAG, local/source library processing, and agent-based note review.
 
-Phase:
+Phase: 2
 
-Branch:
+Branch: Weighted Full Text Search
 
 Branch goal:
-<branch goal>
+Implement determinstic concept identiy lookup and weighted SQLite full-text retrieval for concepts and scaffold modules to not only incorporate as part of the entire retrieval system but to also utilize as a baseline when implementing the embedding pipeline for retrieval in later branches.
 
 Expected outcome:
-<what the system should be able to do after this branch>
+
 
 Relevant context:
 <briefly paste or summarize relevant details from the Phase Roadmap, Technical Plan, Branch Plan, schemas, system models, or prior branches>

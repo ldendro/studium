@@ -315,9 +315,15 @@ def _mark_invalid(
                 invalid_records.delete_invalid_records_for_path(connection, analysis.moved_from)
 
         # If this path previously owned a different concept id, remove that too.
+        # Only compare when the current concept id is known; otherwise
+        # ``str(previous_id) != None`` would always be true and drop the wrong row.
         if analysis.previous is not None and analysis.moved_from is None:
             previous_id = analysis.previous.get("concept_id")
-            if previous_id is not None and str(previous_id) != remove_concept_id:
+            if (
+                previous_id is not None
+                and remove_concept_id is not None
+                and str(previous_id) != remove_concept_id
+            ):
                 existing = concepts.get_concept(connection, str(previous_id))
                 if existing is not None and existing.get("file_path") == analysis.path:
                     projections.remove_concept_projection(connection, str(previous_id))

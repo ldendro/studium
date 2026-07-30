@@ -186,6 +186,26 @@ def test_valid_then_invalid_removes_searchable_projection(
         assert indexed["index_state"] == "invalid"
 
 
+def test_valid_then_unparseable_invalid_still_removes_previous_concept(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    """Invalid content with no concept id must still drop the path-owned projection."""
+    write_concept_note(vault_root, "concepts/a.md", id="concept_vi_noid")
+    sync_vault(vault, initialized_engine, index_config)
+    write_invalid_note(vault_root, "concepts/a.md", "not even yaml\n")
+    report = sync_vault(vault, initialized_engine, index_config)
+    assert report.counts.invalid == 1
+    with begin_connection(initialized_engine) as connection:
+        assert concepts.get_concept(connection, "concept_vi_noid") is None
+        indexed = indexed_files.get_indexed_file(connection, "concepts/a.md")
+        assert indexed is not None
+        assert indexed["index_state"] == "invalid"
+        assert indexed["concept_id"] is None
+
+
 def test_invalid_then_valid_restores_projection(
     vault: Vault,
     vault_root: Path,
