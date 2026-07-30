@@ -45,10 +45,10 @@ Branch goal:
 Implement determinstic concept identiy lookup and weighted SQLite full-text retrieval for concepts and scaffold modules to not only incorporate as part of the entire retrieval system but to also utilize as a baseline when implementing the embedding pipeline for retrieval in later branches.
 
 Expected outcome:
-
+The sparse retrieval side of the retreival system is fully functional, where exact IDs, titles, and approved aliases resolve deterministically. 
 
 Relevant context:
-<briefly paste or summarize relevant details from the Phase Roadmap, Technical Plan, Branch Plan, schemas, system models, or prior branches>
+Within the Phase 2 - Concept Graph Core folder, the fiels 2- Final Phase Roadmap, 3 - Technical Plan, and 4 - Branch Plan. 
 
 Known constraints:
 - Keep implementation scoped to this branch.
