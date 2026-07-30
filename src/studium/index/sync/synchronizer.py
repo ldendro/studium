@@ -10,7 +10,13 @@ from sqlalchemy import Engine
 
 from studium.index.config import IndexConfig
 from studium.index.engine import begin_connection
-from studium.index.repositories import concepts, indexed_files, projections, scaffold_modules
+from studium.index.repositories import (
+    concepts,
+    indexed_files,
+    invalid_records,
+    projections,
+    scaffold_modules,
+)
 from studium.index.schema_manager import (
     ensure_compatible_index,
     get_index_revision,
@@ -84,7 +90,7 @@ def sync_vault(vault: Vault, engine: Engine, config: IndexConfig) -> SyncReport:
             )
             usable_state_changed = usable_state_changed or changed
             embedding_work.extend(work)
-            if analysis.sync_class in {
+            if changed and analysis.sync_class in {
                 FileSyncClass.INVALID,
                 FileSyncClass.DUPLICATE_ID_CONFLICT,
             }:
@@ -192,13 +198,17 @@ def _apply_analysis(
     previous_modules = _load_previous_modules(engine, projection.concept_id)
 
     with begin_connection(engine) as connection:
+        # Path-owned concept ID changed (A → B): drop the old projection first.
+        if analysis.previous is not None and analysis.moved_from is None:
+            previous_id = analysis.previous.get("concept_id")
+            if previous_id is not None and str(previous_id) != projection.concept_id:
+                existing = concepts.get_concept(connection, str(previous_id))
+                if existing is not None and existing.get("file_path") == analysis.path:
+                    projections.remove_concept_projection(connection, str(previous_id))
+
         if analysis.sync_class == FileSyncClass.MOVED and analysis.moved_from is not None:
             indexed_files.delete_indexed_file(connection, analysis.moved_from)
-            counts.moved += 1
-        elif analysis.sync_class == FileSyncClass.NEW:
-            counts.created += 1
-        else:
-            counts.updated += 1
+            invalid_records.delete_invalid_records_for_path(connection, analysis.moved_from)
 
         projections.upsert_concept_projection(
             connection,
@@ -223,6 +233,14 @@ def _apply_analysis(
             ),
         )
 
+    # Counters only after a successful commit (upsert rolled back ⇒ no count bump).
+    if analysis.sync_class == FileSyncClass.MOVED:
+        counts.moved += 1
+    elif analysis.sync_class == FileSyncClass.NEW:
+        counts.created += 1
+    else:
+        counts.updated += 1
+
     work = _embedding_work_for_projection(
         projection,
         previous_concept=previous_concept,
@@ -245,6 +263,7 @@ def _remove_file(
             if existing is not None and existing.get("file_path") == analysis.path:
                 projections.remove_concept_projection(connection, analysis.concept_id)
         indexed_files.delete_indexed_file(connection, analysis.path)
+        invalid_records.delete_invalid_records_for_path(connection, analysis.path)
     counts.removed += 1
     return True
 
@@ -261,6 +280,16 @@ def _mark_invalid(
     scanned = analysis.scanned
     file_hash = None if scanned is None else scanned.file_hash
     mtime_ns = None if scanned is None else scanned.mtime_ns
+
+    # Unchanged invalid/conflict content: do not rewrite diagnostics or bump revision.
+    if (
+        analysis.previous is not None
+        and analysis.previous.get("file_hash") == file_hash
+        and analysis.previous.get("index_state") == analysis.sync_class.value
+    ):
+        counts.unchanged += 1
+        return False
+
     message = "; ".join(analysis.reasons) if analysis.reasons else reason_code
     details = {
         "reasons": analysis.reasons,
@@ -283,6 +312,7 @@ def _mark_invalid(
                     if existing is not None and existing.get("file_path") == analysis.moved_from:
                         projections.remove_concept_projection(connection, str(old_concept_id))
                 indexed_files.delete_indexed_file(connection, analysis.moved_from)
+                invalid_records.delete_invalid_records_for_path(connection, analysis.moved_from)
 
         # If this path previously owned a different concept id, remove that too.
         if analysis.previous is not None and analysis.moved_from is None:

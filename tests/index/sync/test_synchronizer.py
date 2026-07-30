@@ -273,6 +273,10 @@ def test_atomic_rollback_leaves_no_partial_children(
     monkeypatch.setattr(projections, "upsert_concept_projection", _boom)
     report = sync_vault(vault, initialized_engine, index_config)
     assert report.errors
+    assert report.counts.created == 0
+    assert report.counts.updated == 0
+    assert report.counts.moved == 0
+    assert report.counts.invalid == 1
     with begin_connection(initialized_engine) as connection:
         assert concepts.get_concept(connection, "concept_atom_001") is None
 
@@ -289,3 +293,72 @@ def test_revision_unchanged_on_pure_no_changes(
     report = sync_vault(vault, initialized_engine, index_config)
     assert report.status == SyncStatus.NO_CHANGES
     assert get_index_revision(initialized_engine) == before
+
+
+def test_concept_id_change_removes_previous_projection(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(vault_root, "concepts/a.md", id="concept_old_aaaaaa", canonical_title="Old")
+    sync_vault(vault, initialized_engine, index_config)
+    write_concept_note(vault_root, "concepts/a.md", id="concept_new_bbbbbb", canonical_title="New")
+    report = sync_vault(vault, initialized_engine, index_config)
+    assert report.counts.updated == 1
+    with begin_connection(initialized_engine) as connection:
+        assert concepts.get_concept(connection, "concept_old_aaaaaa") is None
+        new_row = concepts.get_concept(connection, "concept_new_bbbbbb")
+        assert new_row is not None
+        assert new_row["file_path"] == "concepts/a.md"
+        indexed = indexed_files.get_indexed_file(connection, "concepts/a.md")
+        assert indexed is not None
+        assert indexed["concept_id"] == "concept_new_bbbbbb"
+
+
+def test_unchanged_invalid_file_does_not_bump_revision(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_invalid_note(vault_root, "concepts/bad.md", "not a concept note\n")
+    first = sync_vault(vault, initialized_engine, index_config)
+    assert first.status == SyncStatus.PARTIAL_SUCCESS
+    assert first.revision_after == 1
+    with begin_connection(initialized_engine) as connection:
+        before_records = invalid_records.list_invalid_records(connection)
+        before_indexed = indexed_files.get_indexed_file(connection, "concepts/bad.md")
+    assert before_indexed is not None
+    before_invalid_since = before_indexed["invalid_since_revision"]
+
+    second = sync_vault(vault, initialized_engine, index_config)
+    assert second.status == SyncStatus.NO_CHANGES
+    assert second.revision_after == first.revision_after
+    assert second.counts.invalid == 0
+    assert second.counts.unchanged == 1
+    with begin_connection(initialized_engine) as connection:
+        after_records = invalid_records.list_invalid_records(connection)
+        after_indexed = indexed_files.get_indexed_file(connection, "concepts/bad.md")
+    assert after_indexed is not None
+    assert after_indexed["invalid_since_revision"] == before_invalid_since
+    assert len(after_records) == len(before_records)
+
+
+def test_delete_invalid_file_clears_invalid_records(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_invalid_note(vault_root, "concepts/bad.md", "broken note")
+    sync_vault(vault, initialized_engine, index_config)
+    with begin_connection(initialized_engine) as connection:
+        assert invalid_records.list_invalid_records(connection)
+
+    (vault_root / "concepts/bad.md").unlink()
+    report = sync_vault(vault, initialized_engine, index_config)
+    assert report.counts.removed == 1
+    with begin_connection(initialized_engine) as connection:
+        assert indexed_files.get_indexed_file(connection, "concepts/bad.md") is None
+        assert invalid_records.list_invalid_records(connection) == []
