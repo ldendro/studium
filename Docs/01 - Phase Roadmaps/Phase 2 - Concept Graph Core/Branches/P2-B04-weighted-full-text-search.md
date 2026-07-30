@@ -414,9 +414,11 @@ def search_concepts_fts(
     - AND tokens together. Empty token list → no MATCH; return ``[]``.
 
     Ranking:
-    - ``bm25(concept_fts, title_w, aliases_w, domains_w, overview_w)``.
-    - Initial weights (tunable constants): title > aliases > overview > domains.
-    - SQLite BM25: **lower score is better**; results ``ORDER BY score``.
+    - ``bm25(...)`` weights are **positional across all FTS columns**, including
+      UNINDEXED ids — pass ``0.0`` for ``concept_id`` then title/aliases/domains/
+      overview (10/8/2/4). Omitting those placeholders mis-assigns weights.
+    - SQLite BM25: **lower score is better**;
+      ``ORDER BY score, concept_id`` for stable ties.
     - Tokenizer: ``unicode61`` **without** porter stemming (FTS-side only;
       independent of Python ``normalize_for_lookup``).
 
@@ -443,7 +445,8 @@ def search_modules_fts(
     ``focus``, ``body``. Body may be empty in B04 (focus/empty materialization);
     title/type/focus still index.
 
-    Weights: module title > focus > type > body.
+    Weights: ``0.0, 0.0`` for unindexed module/concept ids, then title/type/
+    focus/body (8/2/3/1). ``ORDER BY score, module_id`` for stable ties.
 
     Hits always carry parent ``concept_id`` (and ``parent_canonical_title`` when
     available) plus optional ``heading`` / ``anchor`` from the scaffold-module

@@ -34,3 +34,22 @@ def normalize_title(text: str) -> str:
     matching use the same rules.
     """
     return normalize_for_lookup(text)
+
+
+def dedupe_aliases_by_normalized(aliases: list[str]) -> list[str]:
+    """Keep the first display alias for each distinct normalized form.
+
+    ``foo-bar`` and ``foo_bar`` share a normalized key under
+    ``normalize_for_lookup``, but ``concept_aliases`` is unique on
+    ``(concept_id, normalized_alias)``. Deduplicating before insert avoids
+    integrity errors during projection.
+    """
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for alias in aliases:
+        key = normalize_for_lookup(alias)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(alias)
+    return deduped

@@ -19,6 +19,7 @@ from studium.index import (
 )
 from studium.index.config import IndexConfig
 from studium.index.repositories import fts
+from studium.index.search.weights import CONCEPT_FTS_WEIGHTS, MODULE_FTS_WEIGHTS
 from studium.vault import Vault
 from tests.index.sync.helpers import write_concept_note
 
@@ -205,6 +206,71 @@ def test_lexical_facade_exact_then_related(
     related = search_concepts_lexical(initialized_engine, "optimizer machine learning")
     assert related.resolution_state == ResolutionState.RELATED_RESULTS
     assert related.concept_hits
+
+
+def test_alias_hyphen_underscore_variants_do_not_break_sync(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(
+        vault_root,
+        "concepts/variants.md",
+        id="concept_var_eeeeee",
+        canonical_title="Variant Concept",
+    )
+    path = vault_root / "concepts/variants.md"
+    text_value = path.read_text(encoding="utf-8")
+    path.write_text(
+        text_value.replace("aliases: []", "aliases:\n  - foo-bar\n  - foo_bar"),
+        encoding="utf-8",
+    )
+    report = sync_vault(vault, initialized_engine, index_config)
+    assert not report.errors
+
+    resolution = resolve_concept_identity(initialized_engine, "foo-bar")
+    assert resolution.is_unique
+    assert resolution.unique_match is not None
+    assert resolution.unique_match.concept_id == "concept_var_eeeeee"
+
+
+def test_fts_tie_break_is_stable_by_concept_id(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    # Same overview-only term → equal BM25; secondary ORDER BY concept_id.
+    write_concept_note(
+        vault_root,
+        "concepts/z.md",
+        id="concept_z_zzzzzz",
+        canonical_title="Concept Z",
+        overview="sharedtiebreakterm appears once.",
+    )
+    write_concept_note(
+        vault_root,
+        "concepts/a.md",
+        id="concept_a_aaaaaa",
+        canonical_title="Concept A",
+        overview="sharedtiebreakterm appears once.",
+    )
+    sync_vault(vault, initialized_engine, index_config)
+
+    query = "sharedtiebreakterm"
+    first = [hit.concept_id for hit in search_concepts_fts(initialized_engine, query)]
+    # Unrelated metadata-style re-sync should not reshuffle ties.
+    sync_vault(vault, initialized_engine, index_config)
+    second = [hit.concept_id for hit in search_concepts_fts(initialized_engine, query)]
+    assert first == second == ["concept_a_aaaaaa", "concept_z_zzzzzz"]
+
+
+def test_bm25_weight_tuples_include_unindexed_placeholders() -> None:
+    assert CONCEPT_FTS_WEIGHTS[0] == 0.0
+    assert CONCEPT_FTS_WEIGHTS[1:] == (10.0, 8.0, 2.0, 4.0)
+    assert MODULE_FTS_WEIGHTS[:2] == (0.0, 0.0)
+    assert MODULE_FTS_WEIGHTS[2:] == (8.0, 2.0, 3.0, 1.0)
 
 
 def test_fts_tables_created_on_initialize(initialized_engine: Engine) -> None:

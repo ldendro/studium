@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from sqlalchemy.engine import Connection
 
+from studium.index.normalize import dedupe_aliases_by_normalized
 from studium.index.repositories import aliases as aliases_repo
 from studium.index.repositories import concepts as concepts_repo
 from studium.index.repositories import domains as domains_repo
@@ -53,7 +54,9 @@ def upsert_concept_projection(
     search_documents_repo.delete_concept_search_document(connection, concept_id)
 
     concepts_repo.upsert_concept(connection, concept)
-    for alias in alias_values:
+    # Hyphen/underscore variants normalize to the same key; keep one row each.
+    unique_aliases = dedupe_aliases_by_normalized(alias_values)
+    for alias in unique_aliases:
         aliases_repo.insert_alias(connection, concept_id=concept_id, alias=alias)
     for domain in domain_values:
         domains_repo.insert_domain(connection, concept_id=concept_id, domain=domain)

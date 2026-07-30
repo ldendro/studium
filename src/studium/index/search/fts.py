@@ -51,7 +51,7 @@ def search_concepts_fts(
                overview
         FROM {CONCEPT_FTS_TABLE}
         WHERE {CONCEPT_FTS_TABLE} MATCH :match
-        ORDER BY score
+        ORDER BY score, concept_id
         LIMIT :limit
         """
     )
@@ -105,7 +105,7 @@ def search_modules_fts(
                body
         FROM {MODULE_FTS_TABLE}
         WHERE {MODULE_FTS_TABLE} MATCH :match
-        ORDER BY score
+        ORDER BY score, module_id
         LIMIT :limit
         """
     )
