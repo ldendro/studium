@@ -301,6 +301,10 @@ def test_matched_fields_use_fts_token_boundaries() -> None:
     assert set(tokenize_fts_text("internet")) & set(tokenize_fts_text("Internet"))
     assert set(tokenize_fts_text("cafe")) & set(tokenize_fts_text("café culture"))
     assert tokenize_fts_text("café") == ["cafe"]
+    # unicode61 keeps ß; Python casefold would wrongly emit "strasse".
+    assert tokenize_fts_text("Straße") == ["straße"]
+    # Indic virama must survive (not NFKD+strip-all-Mn → करम).
+    assert tokenize_fts_text("कर्म") == ["कर", "म"]
 
 
 def test_underscore_query_matches_nonadjacent_terms(
@@ -339,6 +343,60 @@ def test_matched_fields_cafe_credits_accented_overview(
     hits = search_concepts_fts(initialized_engine, "cafe")
     assert hits
     assert hits[0].matched_fields == ["overview"]
+
+
+def test_identity_lookup_folds_cafe_diacritics(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(
+        vault_root,
+        "concepts/cafe-title.md",
+        id="concept_cafe_jjjjjj",
+        canonical_title="Café",
+    )
+    sync_vault(vault, initialized_engine, index_config)
+    resolution = resolve_concept_identity(initialized_engine, "cafe")
+    assert resolution.is_unique
+    assert resolution.unique_match is not None
+    assert resolution.unique_match.concept_id == "concept_cafe_jjjjjj"
+    assert resolution.unique_match.match_type == ExactMatchType.CANONICAL_TITLE
+
+
+def test_fts_preserves_strasse_and_indic_queries(
+    vault: Vault,
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(
+        vault_root,
+        "concepts/strasse.md",
+        id="concept_str_kkkkkk",
+        canonical_title="Other",
+        overview="road named Straße in the city",
+    )
+    write_concept_note(
+        vault_root,
+        "concepts/indic.md",
+        id="concept_ind_llllll",
+        canonical_title="Other Two",
+        overview="concept कर्म in overview",
+    )
+    sync_vault(vault, initialized_engine, index_config)
+
+    strasse_hits = search_concepts_fts(initialized_engine, "Straße")
+    assert strasse_hits
+    assert strasse_hits[0].concept_id == "concept_str_kkkkkk"
+
+    # casefold approximation would search "strasse" and miss this row
+    assert search_concepts_fts(initialized_engine, "strasse") == []
+
+    indic_hits = search_concepts_fts(initialized_engine, "कर्म")
+    assert indic_hits
+    assert indic_hits[0].concept_id == "concept_ind_llllll"
 
 
 def test_clear_all_tables_also_clears_fts(

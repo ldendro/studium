@@ -11,13 +11,34 @@ _HYPHEN_UNDERSCORE = re.compile(r"[-_]+")
 _SURROUNDING_PUNCT = re.compile(r"^[\s\"'`.,:;!?()\[\]{}<>]+|[\s\"'`.,:;!?()\[\]{}<>]+$")
 
 
+def _strip_latin_combining_marks(text: str) -> str:
+    """Remove Latin combining diacritics (unicode61 ``remove_diacritics 1``-like).
+
+    Keeps script-specific non-spacing marks such as Devanagari virama so identity
+    folding does not rewrite Indic orthography.
+    """
+    parts: list[str] = []
+    for char in unicodedata.normalize("NFKD", text):
+        if unicodedata.category(char) == "Mn":
+            name = unicodedata.name(char, "")
+            if "COMBINING" in name:
+                continue
+            parts.append(char)
+            continue
+        parts.append(char)
+    return "".join(parts)
+
+
 def normalize_for_lookup(text: str) -> str:
     """Normalize text for deterministic title/alias equality matching.
 
-    Matching-only transforms (Technical Plan §4.8). Does not stem, rewrite
-    technical terms, or mutate display/metadata source strings held elsewhere.
+    Matching-only transforms (Technical Plan §4.8), plus Latin diacritic folding
+    so identity lookup agrees with FTS ``remove_diacritics 1`` (``cafe`` ≡
+    ``Café``). Does not stem or mutate display/metadata source strings held
+    elsewhere.
     """
-    normalized = unicodedata.normalize("NFKC", text)
+    normalized = _strip_latin_combining_marks(text)
+    normalized = unicodedata.normalize("NFKC", normalized)
     normalized = normalized.casefold()
     normalized = _HYPHEN_UNDERSCORE.sub(" ", normalized)
     normalized = _SURROUNDING_PUNCT.sub("", normalized)

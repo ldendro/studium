@@ -9,7 +9,7 @@ from sqlalchemy.engine import Connection
 
 # FTS tokenizer lives here (not in search.weights) to avoid importing the search
 # package from repositories — that cycle broke package import.
-# remove_diacritics 1 keeps café/cafe aligned with Python tokenize_fts_text.
+# Query tokenization uses this same DDL string via SQLite fts5vocab.
 FTS_TOKENIZER = "unicode61 remove_diacritics 1"
 
 CONCEPT_FTS_TABLE = "concept_fts"

@@ -1,39 +1,42 @@
-"""FTS5 query construction helpers that mirror the unicode61 tokenizer."""
+"""FTS5 query tokenization via the real SQLite unicode61 tokenizer."""
 
 from __future__ import annotations
 
-import unicodedata
+import sqlite3
+import threading
+
+from studium.index.repositories.fts import FTS_TOKENIZER
+
+_lock = threading.Lock()
+_tokenizer_connection: sqlite3.Connection | None = None
+
+
+def _get_tokenizer_connection() -> sqlite3.Connection:
+    """Lazy in-memory FTS table used only to extract unicode61 tokens."""
+    global _tokenizer_connection
+    if _tokenizer_connection is None:
+        connection = sqlite3.connect(":memory:", check_same_thread=False)
+        connection.execute(f"CREATE VIRTUAL TABLE doc USING fts5(body, tokenize='{FTS_TOKENIZER}')")
+        connection.execute("CREATE VIRTUAL TABLE doc_vocab USING fts5vocab(doc, 'instance')")
+        _tokenizer_connection = connection
+    return _tokenizer_connection
 
 
 def tokenize_fts_text(text: str) -> list[str]:
-    """Tokenize text the way our FTS5 ``unicode61`` tables do.
+    """Return tokens exactly as our FTS5 ``unicode61`` tables would index them.
 
-    Mirrors SQLite FTS5 unicode61 with diacritic removal (observed on current
-    SQLite and made explicit via ``remove_diacritics 1`` in DDL):
+    Uses SQLite's own tokenizer (including ``remove_diacritics 1``) rather than a
+    Python NFKD/casefold approximation, which mishandles cases such as German
+    ``ß`` (``Straße`` → ``straße``, not ``strasse``) and Indic marks
+    (``कर्म`` must keep the virama).
 
-    - NFKD + strip non-spacing marks
-    - casefold
-    - split on non-alphanumeric boundaries (``_`` and ``-`` are separators)
-
-    Used both for MATCH query construction and ``matched_fields`` diagnostics so
-    retrieval metadata agrees with ranking.
+    Used for MATCH query construction and ``matched_fields`` diagnostics.
     """
-    normalized = unicodedata.normalize("NFKD", text)
-    folded_chars: list[str] = []
-    for char in normalized:
-        if unicodedata.category(char) == "Mn":
-            continue
-        folded_chars.append(char.casefold())
-    folded = "".join(folded_chars)
-
-    tokens: list[str] = []
-    current: list[str] = []
-    for char in folded:
-        if char.isalnum():
-            current.append(char)
-        elif current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
+    if not text:
+        return []
+    with _lock:
+        connection = _get_tokenizer_connection()
+        connection.execute("DELETE FROM doc")
+        connection.execute("INSERT INTO doc(body) VALUES (?)", (text,))
+        rows = connection.execute("SELECT term FROM doc_vocab ORDER BY offset").fetchall()
+    return [str(row[0]) for row in rows]
