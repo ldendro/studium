@@ -1,10 +1,32 @@
 """Derived SQLite concept index (Phase 2).
 
 Provides path resolution, SQLAlchemy Core schema, schema-version handling,
-repositories, vault synchronization, and lexical search.
+repositories, vault synchronization, lexical search, and embeddings.
 """
 
-from studium.index.config import DEFAULT_BUSY_TIMEOUT_MS, INDEX_SCHEMA_VERSION, IndexConfig
+from studium.index.config import (
+    DEFAULT_BUSY_TIMEOUT_MS,
+    DEFAULT_EMBEDDING_BATCH_SIZE,
+    DEFAULT_EMBEDDING_MODEL_ID,
+    INDEX_SCHEMA_VERSION,
+    MAX_MODULE_EMBED_CHARS,
+    IndexConfig,
+)
+from studium.index.embeddings import (
+    EmbeddingModelMetadata,
+    EmbeddingProcessReport,
+    EmbeddingProvider,
+    FakeEmbeddingProvider,
+    SentenceTransformersEmbeddingProvider,
+    SyncAndEmbedReport,
+    embed_query,
+    enumerate_embedding_work,
+    merge_embedding_work,
+    pack_vector,
+    process_embedding_work,
+    sync_and_embed,
+    unpack_vector,
+)
 from studium.index.engine import begin_connection, create_index_engine, read_pragma
 from studium.index.errors import (
     ConceptIndexError,
@@ -44,10 +66,17 @@ from studium.index.sync import (
 
 __all__ = [
     "DEFAULT_BUSY_TIMEOUT_MS",
+    "DEFAULT_EMBEDDING_BATCH_SIZE",
+    "DEFAULT_EMBEDDING_MODEL_ID",
     "INDEX_SCHEMA_VERSION",
+    "MAX_MODULE_EMBED_CHARS",
     "ConceptIndexError",
+    "EmbeddingModelMetadata",
+    "EmbeddingProcessReport",
+    "EmbeddingProvider",
     "EmbeddingWorkRequest",
     "ExactMatchType",
+    "FakeEmbeddingProvider",
     "IdentityResolution",
     "IndexConfig",
     "IndexIntegrityError",
@@ -55,6 +84,8 @@ __all__ = [
     "IndexSchemaMismatchError",
     "LexicalSearchResult",
     "ResolutionState",
+    "SentenceTransformersEmbeddingProvider",
+    "SyncAndEmbedReport",
     "SyncCounts",
     "SyncReport",
     "SyncStatus",
@@ -62,13 +93,18 @@ __all__ = [
     "create_engine_for_config",
     "create_index_engine",
     "derive_vault_identifier",
+    "embed_query",
     "ensure_compatible_index",
+    "enumerate_embedding_work",
     "get_index_revision",
     "increment_index_revision",
     "index_db_path",
     "initialize_index",
+    "merge_embedding_work",
     "normalize_for_lookup",
     "normalize_title",
+    "pack_vector",
+    "process_embedding_work",
     "read_index_schema_version",
     "read_pragma",
     "rebuild_index",
@@ -78,5 +114,7 @@ __all__ = [
     "search_concepts_fts",
     "search_concepts_lexical",
     "search_modules_fts",
+    "sync_and_embed",
     "sync_vault",
+    "unpack_vector",
 ]

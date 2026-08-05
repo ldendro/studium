@@ -216,15 +216,23 @@ embeddings = Table(
         ForeignKey("concepts.concept_id", ondelete="CASCADE"),
         nullable=True,
     ),
-    Column("segment_id", Text, nullable=True),
+    Column("segment_id", Text, nullable=False, server_default=""),
     Column("embedding_type", String(64), nullable=False),
     Column("vector", BLOB, nullable=False),
     Column("dimension", Integer, nullable=False),
     Column("model_id", Text, nullable=False),
     Column("model_revision", Text, nullable=True),
+    Column("normalizes_embeddings", Boolean, nullable=False, server_default="1"),
     Column("input_hash", String(128), nullable=False),
     Column("created_at", Text, nullable=False),
     Column("indexed_revision", Integer, nullable=False),
+    UniqueConstraint(
+        "owner_type",
+        "owner_id",
+        "embedding_type",
+        "segment_id",
+        name="uq_embeddings_owner_type_segment",
+    ),
 )
 
 invalid_index_records = Table(
