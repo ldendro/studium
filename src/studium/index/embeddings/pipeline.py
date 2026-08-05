@@ -15,6 +15,9 @@ from studium.index.engine import begin_connection
 from studium.index.repositories import embeddings as embeddings_repo
 from studium.index.sync.models import EmbeddingWorkRequest
 
+# Persisted sentinel: prior dimension-mismatch rejection for this input/model.
+_REJECTION_DIMENSION = 0
+
 
 def _utc_now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -49,6 +52,7 @@ class EmbeddingProcessReport(BaseModel):
     skipped: int = 0
     embedded: int = 0
     written: int = 0
+    failed: int = 0
     model_id: str = ""
     dimension: int = 0
     errors: list[str] = Field(default_factory=_empty_strings)
@@ -70,8 +74,9 @@ def process_embedding_work(
     """Batch-generate embeddings for deferred sync work and upsert rows.
 
     Skips items whose stored row already matches input hash and active model
-    metadata (including normalization mode). Provider calls happen before short
-    DB write transactions.
+    metadata (including normalization mode), and items previously rejected for
+    a dimension mismatch under the same model identity. Provider calls happen
+    before short DB write transactions.
     """
     meta = provider.model_metadata()
     report = EmbeddingProcessReport(
@@ -92,7 +97,7 @@ def process_embedding_work(
                 embedding_type=item.embedding_type,
                 segment_id=item.segment_id,
             )
-            if existing is not None and _row_matches(existing, item, meta):
+            if existing is not None and _should_skip(existing, item, meta):
                 report.skipped += 1
                 continue
             to_embed.append(item)
@@ -112,7 +117,6 @@ def process_embedding_work(
         if len(vectors) != len(batch):
             report.errors.append(f"Provider returned {len(vectors)} vectors for {len(batch)} texts")
             continue
-        report.embedded += len(batch)
         now = _utc_now_iso()
         with begin_connection(engine) as connection:
             for item, vector in zip(batch, vectors, strict=True):
@@ -121,27 +125,70 @@ def process_embedding_work(
                         f"{item.owner_id}/{item.embedding_type}: "
                         f"got dim {len(vector)}, expected {meta.dimension}"
                     )
+                    report.failed += 1
+                    # Durable rejection so the same input/model is not re-sent forever.
+                    embeddings_repo.upsert_embedding(
+                        connection,
+                        _embedding_row_values(
+                            item,
+                            meta,
+                            vector_blob=b"",
+                            dimension=_REJECTION_DIMENSION,
+                            indexed_revision=indexed_revision,
+                            created_at=now,
+                        ),
+                    )
                     continue
                 embeddings_repo.upsert_embedding(
                     connection,
-                    {
-                        "owner_type": item.owner_type,
-                        "owner_id": item.owner_id,
-                        "parent_concept_id": item.parent_concept_id,
-                        "segment_id": item.segment_id,
-                        "embedding_type": item.embedding_type,
-                        "vector": pack_vector(vector),
-                        "dimension": meta.dimension,
-                        "model_id": meta.model_id,
-                        "model_revision": meta.model_revision,
-                        "normalizes_embeddings": meta.normalizes_embeddings,
-                        "input_hash": item.input_hash,
-                        "created_at": now,
-                        "indexed_revision": indexed_revision,
-                    },
+                    _embedding_row_values(
+                        item,
+                        meta,
+                        vector_blob=pack_vector(vector),
+                        dimension=meta.dimension,
+                        indexed_revision=indexed_revision,
+                        created_at=now,
+                    ),
                 )
+                report.embedded += 1
                 report.written += 1
     return report
+
+
+def _embedding_row_values(
+    item: EmbeddingWorkRequest,
+    meta: EmbeddingModelMetadata,
+    *,
+    vector_blob: bytes,
+    dimension: int,
+    indexed_revision: int,
+    created_at: str,
+) -> dict[str, Any]:
+    return {
+        "owner_type": item.owner_type,
+        "owner_id": item.owner_id,
+        "parent_concept_id": item.parent_concept_id,
+        "segment_id": item.segment_id,
+        "embedding_type": item.embedding_type,
+        "vector": vector_blob,
+        "dimension": dimension,
+        "model_id": meta.model_id,
+        "model_revision": meta.model_revision,
+        "normalizes_embeddings": meta.normalizes_embeddings,
+        "input_hash": item.input_hash,
+        "created_at": created_at,
+        "indexed_revision": indexed_revision,
+    }
+
+
+def _should_skip(
+    existing: dict[str, Any],
+    item: EmbeddingWorkRequest,
+    meta: EmbeddingModelMetadata,
+) -> bool:
+    if _row_matches(existing, item, meta):
+        return True
+    return _is_dimension_rejection(existing, item, meta)
 
 
 def _row_matches(
@@ -156,6 +203,26 @@ def _row_matches(
         str(existing.get("input_hash")) == item.input_hash
         and str(existing.get("model_id")) == meta.model_id
         and int(existing.get("dimension") or 0) == meta.dimension
+        and (existing.get("model_revision") == meta.model_revision)
+        and stored_normalize == meta.normalizes_embeddings
+    )
+
+
+def _is_dimension_rejection(
+    existing: dict[str, Any],
+    item: EmbeddingWorkRequest,
+    meta: EmbeddingModelMetadata,
+) -> bool:
+    """True when a prior dim-mismatch rejection exists for this input/model."""
+    stored_normalize = _as_bool(existing.get("normalizes_embeddings"))
+    if stored_normalize is None:
+        return False
+    raw_dim = existing.get("dimension")
+    stored_dim = -1 if raw_dim is None else int(raw_dim)
+    return (
+        stored_dim == _REJECTION_DIMENSION
+        and str(existing.get("input_hash")) == item.input_hash
+        and str(existing.get("model_id")) == meta.model_id
         and (existing.get("model_revision") == meta.model_revision)
         and stored_normalize == meta.normalizes_embeddings
     )

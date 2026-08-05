@@ -8,6 +8,9 @@ from studium.index.embeddings.pipeline import (
     process_embedding_work,
 )
 from studium.index.embeddings.protocol import EmbeddingModelMetadata, EmbeddingProvider
+from studium.index.embeddings.sentence_transformers_provider import (
+    SentenceTransformersEmbeddingProvider,
+)
 from studium.index.embeddings.serialize import pack_vector, unpack_vector
 from studium.index.embeddings.sync_embed import (
     SyncAndEmbedReport,
@@ -20,6 +23,7 @@ __all__ = [
     "EmbeddingProcessReport",
     "EmbeddingProvider",
     "FakeEmbeddingProvider",
+    "SentenceTransformersEmbeddingProvider",
     "SyncAndEmbedReport",
     "embed_query",
     "enumerate_embedding_work",

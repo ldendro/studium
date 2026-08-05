@@ -60,6 +60,56 @@ def _upsert_minimal_concept(engine: Engine, concept_id: str, title: str = "A") -
         )
 
 
+def test_dimension_mismatch_fails_without_reembed_loop(
+    initialized_engine: Engine,
+) -> None:
+    from studium.index.embeddings.protocol import EmbeddingModelMetadata
+
+    class WrongDimProvider:
+        def __init__(self) -> None:
+            self.documents_calls: list[list[str]] = []
+
+        def model_metadata(self) -> EmbeddingModelMetadata:
+            return EmbeddingModelMetadata(
+                model_id="wrong-dim",
+                model_revision="test",
+                dimension=4,
+                normalizes_embeddings=True,
+            )
+
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            self.documents_calls.append(list(texts))
+            return [[0.1, 0.2] for _ in texts]  # dim 2, not 4
+
+        def embed_query(self, text: str) -> list[float]:
+            return self.embed_documents([text])[0]
+
+    _upsert_minimal_concept(initialized_engine, "concept_dim", title="Dim")
+    work = [
+        EmbeddingWorkRequest(
+            owner_type="concept",
+            owner_id="concept_dim",
+            embedding_type="concept_identity",
+            input_hash="hash-dim",
+            input_text="Title: Dim\nAliases: ",
+            parent_concept_id="concept_dim",
+        )
+    ]
+    provider = WrongDimProvider()
+    first = process_embedding_work(initialized_engine, work, provider, indexed_revision=1)
+    assert first.failed == 1
+    assert first.embedded == 0
+    assert first.written == 0
+    assert first.errors
+    assert len(provider.documents_calls) == 1
+
+    second = process_embedding_work(initialized_engine, work, provider, indexed_revision=2)
+    assert second.skipped == 1
+    assert second.failed == 0
+    assert second.embedded == 0
+    assert len(provider.documents_calls) == 1
+
+
 def test_pack_unpack_round_trip() -> None:
     values = [0.0, -1.5, 2.25, 0.125]
     blob = pack_vector(values)
