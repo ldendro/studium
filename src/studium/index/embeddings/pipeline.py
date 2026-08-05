@@ -113,13 +113,23 @@ def process_embedding_work(
             vectors = provider.embed_documents(texts)
         except Exception as exc:
             report.errors.append(f"embed_documents failed: {exc}")
+            report.failed += len(batch)
             continue
         if len(vectors) != len(batch):
             report.errors.append(f"Provider returned {len(vectors)} vectors for {len(batch)} texts")
+            report.failed += len(batch)
             continue
         now = _utc_now_iso()
         with begin_connection(engine) as connection:
             for item, vector in zip(batch, vectors, strict=True):
+                parent_concept_id = _resolve_parent_concept_id(item)
+                if parent_concept_id is None:
+                    report.errors.append(
+                        f"{item.owner_id}/{item.embedding_type}: "
+                        "parent_concept_id is required for scaffold_module work"
+                    )
+                    report.failed += 1
+                    continue
                 if len(vector) != meta.dimension:
                     report.errors.append(
                         f"{item.owner_id}/{item.embedding_type}: "
@@ -132,6 +142,7 @@ def process_embedding_work(
                         _embedding_row_values(
                             item,
                             meta,
+                            parent_concept_id=parent_concept_id,
                             vector_blob=b"",
                             dimension=_REJECTION_DIMENSION,
                             indexed_revision=indexed_revision,
@@ -144,6 +155,7 @@ def process_embedding_work(
                     _embedding_row_values(
                         item,
                         meta,
+                        parent_concept_id=parent_concept_id,
                         vector_blob=pack_vector(vector),
                         dimension=meta.dimension,
                         indexed_revision=indexed_revision,
@@ -155,10 +167,24 @@ def process_embedding_work(
     return report
 
 
+def _resolve_parent_concept_id(item: EmbeddingWorkRequest) -> str | None:
+    """Return a concept id that FK-cascades on concept removal.
+
+    Concept work defaults ``parent_concept_id`` to ``owner_id`` when omitted.
+    Module work requires an explicit parent — otherwise the row would orphan.
+    """
+    if item.parent_concept_id is not None:
+        return item.parent_concept_id
+    if item.owner_type == "concept":
+        return item.owner_id
+    return None
+
+
 def _embedding_row_values(
     item: EmbeddingWorkRequest,
     meta: EmbeddingModelMetadata,
     *,
+    parent_concept_id: str,
     vector_blob: bytes,
     dimension: int,
     indexed_revision: int,
@@ -167,7 +193,7 @@ def _embedding_row_values(
     return {
         "owner_type": item.owner_type,
         "owner_id": item.owner_id,
-        "parent_concept_id": item.parent_concept_id,
+        "parent_concept_id": parent_concept_id,
         "segment_id": item.segment_id,
         "embedding_type": item.embedding_type,
         "vector": vector_blob,

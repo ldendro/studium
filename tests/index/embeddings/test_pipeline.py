@@ -110,6 +110,165 @@ def test_dimension_mismatch_fails_without_reembed_loop(
     assert len(provider.documents_calls) == 1
 
 
+def test_provider_exception_counts_batch_as_failed(
+    initialized_engine: Engine,
+) -> None:
+    from studium.index.embeddings.protocol import EmbeddingModelMetadata
+
+    class BoomProvider:
+        def model_metadata(self) -> EmbeddingModelMetadata:
+            return EmbeddingModelMetadata(
+                model_id="boom",
+                model_revision="test",
+                dimension=4,
+                normalizes_embeddings=True,
+            )
+
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            raise RuntimeError("provider down")
+
+        def embed_query(self, text: str) -> list[float]:
+            return [0.0, 0.0, 0.0, 0.0]
+
+    _upsert_minimal_concept(initialized_engine, "concept_boom", title="Boom")
+    work = [
+        EmbeddingWorkRequest(
+            owner_type="concept",
+            owner_id="concept_boom",
+            embedding_type="concept_identity",
+            input_hash="hash-boom",
+            input_text="Title: Boom\nAliases: ",
+            parent_concept_id="concept_boom",
+        )
+    ]
+    report = process_embedding_work(initialized_engine, work, BoomProvider(), indexed_revision=1)
+    assert report.requested == 1
+    assert report.failed == 1
+    assert report.embedded == 0
+    assert report.written == 0
+    assert report.skipped == 0
+    assert any("provider down" in err for err in report.errors)
+
+
+def test_concept_work_defaults_parent_for_cascade(
+    initialized_engine: Engine,
+) -> None:
+    _upsert_minimal_concept(initialized_engine, "concept_orphan_parent", title="Orphan")
+    work = [
+        EmbeddingWorkRequest(
+            owner_type="concept",
+            owner_id="concept_orphan_parent",
+            embedding_type="concept_identity",
+            input_hash="hash-orphan",
+            input_text="Title: Orphan\nAliases: ",
+            # parent_concept_id omitted (default None)
+        )
+    ]
+    report = process_embedding_work(
+        initialized_engine,
+        work,
+        FakeEmbeddingProvider(dimension=4),
+        indexed_revision=1,
+    )
+    assert report.written == 1
+    with begin_connection(initialized_engine) as connection:
+        row = embeddings_repo.get_embedding_for_key(
+            connection,
+            owner_type="concept",
+            owner_id="concept_orphan_parent",
+            embedding_type="concept_identity",
+        )
+        assert row is not None
+        assert row["parent_concept_id"] == "concept_orphan_parent"
+        from studium.index.repositories import projections
+
+        projections.remove_concept_projection(connection, "concept_orphan_parent")
+        assert (
+            embeddings_repo.get_embedding_for_key(
+                connection,
+                owner_type="concept",
+                owner_id="concept_orphan_parent",
+                embedding_type="concept_identity",
+            )
+            is None
+        )
+
+
+def test_module_work_without_parent_fails(
+    initialized_engine: Engine,
+) -> None:
+    work = [
+        EmbeddingWorkRequest(
+            owner_type="scaffold_module",
+            owner_id="module_no_parent",
+            embedding_type="module_semantic",
+            input_hash="hash-mod",
+            input_text="Module Title: X\nModule Type: derivation\nFocus: \nBody: ",
+            segment_id="module_no_parent:0",
+        )
+    ]
+    report = process_embedding_work(
+        initialized_engine,
+        work,
+        FakeEmbeddingProvider(dimension=4),
+        indexed_revision=1,
+    )
+    assert report.failed == 1
+    assert report.written == 0
+    assert any("parent_concept_id is required" in err for err in report.errors)
+
+
+def test_provider_wrong_vector_count_counts_batch_as_failed(
+    initialized_engine: Engine,
+) -> None:
+    from studium.index.embeddings.protocol import EmbeddingModelMetadata
+
+    class ShortBatchProvider:
+        def model_metadata(self) -> EmbeddingModelMetadata:
+            return EmbeddingModelMetadata(
+                model_id="short-batch",
+                model_revision="test",
+                dimension=4,
+                normalizes_embeddings=True,
+            )
+
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [[0.1, 0.2, 0.3, 0.4]]  # one vector for two texts
+
+        def embed_query(self, text: str) -> list[float]:
+            return [0.0, 0.0, 0.0, 0.0]
+
+    _upsert_minimal_concept(initialized_engine, "concept_short_a", title="A")
+    _upsert_minimal_concept(initialized_engine, "concept_short_b", title="B")
+    work = [
+        EmbeddingWorkRequest(
+            owner_type="concept",
+            owner_id="concept_short_a",
+            embedding_type="concept_identity",
+            input_hash="hash-a",
+            input_text="Title: A\nAliases: ",
+            parent_concept_id="concept_short_a",
+        ),
+        EmbeddingWorkRequest(
+            owner_type="concept",
+            owner_id="concept_short_b",
+            embedding_type="concept_identity",
+            input_hash="hash-b",
+            input_text="Title: B\nAliases: ",
+            parent_concept_id="concept_short_b",
+        ),
+    ]
+    report = process_embedding_work(
+        initialized_engine, work, ShortBatchProvider(), indexed_revision=1, batch_size=8
+    )
+    assert report.requested == 2
+    assert report.failed == 2
+    assert report.embedded == 0
+    assert report.written == 0
+    assert report.skipped == 0
+    assert any("vectors for" in err for err in report.errors)
+
+
 def test_pack_unpack_round_trip() -> None:
     values = [0.0, -1.5, 2.25, 0.125]
     blob = pack_vector(values)
