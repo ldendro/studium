@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from sqlalchemy import Engine
 
 from studium.index.config import DEFAULT_EMBEDDING_BATCH_SIZE, IndexConfig
+from studium.index.embeddings.enumerate import enumerate_embedding_work
 from studium.index.embeddings.pipeline import EmbeddingProcessReport, process_embedding_work
 from studium.index.embeddings.protocol import EmbeddingProvider
 from studium.index.sync.models import SyncReport
@@ -27,12 +28,21 @@ def sync_and_embed(
     provider: EmbeddingProvider,
     *,
     batch_size: int = DEFAULT_EMBEDDING_BATCH_SIZE,
+    from_current_projections: bool = True,
 ) -> SyncAndEmbedReport:
-    """Run ``sync_vault`` then ``process_embedding_work`` for emitted requests."""
+    """Run ``sync_vault`` then embed work.
+
+    By default, work is enumerated from current index projections so unchanged
+    vaults still repair missing rows and regenerate on model/metadata changes.
+    Set ``from_current_projections=False`` to process only sync-emitted deltas.
+    """
     sync_report = sync_vault(vault, engine, config)
+    work = (
+        enumerate_embedding_work(engine) if from_current_projections else sync_report.embedding_work
+    )
     embed_report = process_embedding_work(
         engine,
-        sync_report.embedding_work,
+        work,
         provider,
         indexed_revision=sync_report.revision_after,
         batch_size=batch_size,

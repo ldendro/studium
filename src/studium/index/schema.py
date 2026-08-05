@@ -222,6 +222,7 @@ embeddings = Table(
     Column("dimension", Integer, nullable=False),
     Column("model_id", Text, nullable=False),
     Column("model_revision", Text, nullable=True),
+    Column("normalizes_embeddings", Boolean, nullable=False, server_default="1"),
     Column("input_hash", String(128), nullable=False),
     Column("created_at", Text, nullable=False),
     Column("indexed_revision", Integer, nullable=False),

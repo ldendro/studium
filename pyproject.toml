@@ -59,7 +59,7 @@ venv = ".venv"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
-addopts = "--cov=studium --cov-report=term-missing"
+addopts = "--cov=studium --cov-report=term-missing -m 'not embedding'"
 markers = [
-    "embedding: real local embedding-model tests (optional deps; not in default CI)",
+    "embedding: real local embedding-model tests (optional deps; opt-in via pytest -m embedding)",
 ]

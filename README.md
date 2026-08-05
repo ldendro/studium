@@ -83,7 +83,8 @@ Library entrypoints:
 - `studium.index.search_concepts_fts` / `search_modules_fts` — weighted BM25 over FTS5
 - `studium.index.search_concepts_lexical(engine, query)` — lookup first, then FTS
 - `studium.index.process_embedding_work(engine, work, provider)` — batch-embed sync work
-- `studium.index.sync_and_embed(...)` — sync then embed with a provider
+- `studium.index.enumerate_embedding_work(engine)` — rebuild work from current projections
+- `studium.index.sync_and_embed(...)` — sync then embed (defaults to current projections)
 - `studium.index.embed_query(provider, text)` — ephemeral query vector
 
 Lexical search and embedding generation are library-only in this phase (no CLI).
@@ -96,7 +97,12 @@ uv sync --extra embeddings
 ```
 
 Use `FakeEmbeddingProvider` in tests; `SentenceTransformersEmbeddingProvider` for
-real MiniLM-class models on a machine with the optional extra installed.
+real MiniLM-class models on a machine with the optional extra installed. Real-model
+tests are excluded by default; run them with:
+
+```bash
+uv run pytest -m embedding
+```
 
 ## Project structure
 

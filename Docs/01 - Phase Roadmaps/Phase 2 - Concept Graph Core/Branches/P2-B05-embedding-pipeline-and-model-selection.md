@@ -338,14 +338,16 @@ Decisions recorded (2026-08-04) — all recommendations approved:
 
 Shipped (2026-08-04):
 
-- Schema **v4**: `embeddings.segment_id` NOT NULL (default `""`) + unique
-  `(owner_type, owner_id, embedding_type, segment_id)`
+- Schema **v5**: `embeddings.segment_id` NOT NULL (default `""`) + unique
+  `(owner_type, owner_id, embedding_type, segment_id)` + `normalizes_embeddings`
 - Package `studium.index.embeddings`: protocol, float32 LE serialize, fake provider,
   `SentenceTransformersEmbeddingProvider` (optional extra), `process_embedding_work`,
-  `embed_query`, `sync_and_embed`
+  `enumerate_embedding_work`, `embed_query`, `sync_and_embed`
+- `sync_and_embed` defaults to current-projection enumeration (retry / model-change)
+- Removed module embeddings pruned in `upsert_concept_projection`
 - Config: `MAX_MODULE_EMBED_CHARS=4000`, `DEFAULT_EMBEDDING_MODEL_ID` MiniLM,
   `DEFAULT_EMBEDDING_BATCH_SIZE=32`
-- Optional dep: `uv sync --extra embeddings`; pytest marker `embedding`
+- Optional dep: `uv sync --extra embeddings`; pytest marker `embedding` excluded by default
 - Default CI uses `FakeEmbeddingProvider` only (no model download)
 
 Deferred to later branches / follow-ups:

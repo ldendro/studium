@@ -19,6 +19,7 @@ class SentenceTransformersEmbeddingProvider:
         self,
         model_id: str = "sentence-transformers/all-MiniLM-L6-v2",
         *,
+        revision: str | None = None,
         device: str | None = None,
         normalize_embeddings: bool = True,
         batch_size: int = 32,
@@ -38,12 +39,15 @@ class SentenceTransformersEmbeddingProvider:
         kwargs: dict[str, Any] = {}
         if device is not None:
             kwargs["device"] = device
+        if revision is not None:
+            kwargs["revision"] = revision
         model = cast(Any, SentenceTransformer(model_id, **kwargs))
         self._model: Any = model
         dim = int(model.get_sentence_embedding_dimension())
+        resolved_revision = revision if revision is not None else _discover_model_revision(model_id)
         self._metadata = EmbeddingModelMetadata(
             model_id=model_id,
-            model_revision=None,
+            model_revision=resolved_revision,
             dimension=dim,
             normalizes_embeddings=normalize_embeddings,
             max_input_chars=None,
@@ -67,3 +71,17 @@ class SentenceTransformersEmbeddingProvider:
 
     def embed_query(self, text: str) -> list[float]:
         return self.embed_documents([text])[0]
+
+
+def _discover_model_revision(model_id: str) -> str | None:
+    """Resolve the Hub commit SHA for ``model_id`` when huggingface_hub is available."""
+    try:
+        from huggingface_hub import model_info  # type: ignore[import-not-found]
+    except ImportError:
+        return None
+    try:
+        info = cast(Any, model_info(model_id))
+    except Exception:
+        return None
+    sha = getattr(info, "sha", None)
+    return None if sha is None else str(sha)

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B05-embedding-pipeline-and-model-selection.md",
+                "file": "10 - Concepts/Mean Reciprocal Rank (MRR).md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "P2-B05-embedding-pipeline-and-model-selection"
+              "title": "Mean Reciprocal Rank (MRR)"
             }
           }
         ]
@@ -187,9 +187,11 @@
   },
   "active": "ab327e63fe3d023e",
   "lastOpenFiles": [
-    "10 - Concepts/Dense Embedding.md",
     "10 - Concepts/BM25 (Best Matching 25).md",
+    "10 - Concepts/Mean Reciprocal Rank (MRR).md",
+    "10 - Concepts/Recall@K.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B05-embedding-pipeline-and-model-selection.md",
+    "10 - Concepts/Dense Embedding.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/4 - Branch Plan.md",
     "99 - Archive/Branch - Template.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B01-schema-v2-amendments.md",
@@ -213,8 +215,6 @@
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B8-cli-and-phase-verification.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B7-write-proposals-vault-writes.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B6-validation-layer.md",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B3-concept-note-schemas.md",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B2-vault-access-layer.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches",
     "99 - Archive/Software Development Workflow Infographic.png",
     "Untitled.canvas",

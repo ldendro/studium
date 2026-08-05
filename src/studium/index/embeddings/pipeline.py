@@ -24,6 +24,22 @@ def _empty_strings() -> list[str]:
     return []
 
 
+def _as_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes"}:
+            return True
+        if lowered in {"0", "false", "no"}:
+            return False
+    return None
+
+
 class EmbeddingProcessReport(BaseModel):
     """Outcome of ``process_embedding_work``."""
 
@@ -54,7 +70,8 @@ def process_embedding_work(
     """Batch-generate embeddings for deferred sync work and upsert rows.
 
     Skips items whose stored row already matches input hash and active model
-    metadata. Provider calls happen before short DB write transactions.
+    metadata (including normalization mode). Provider calls happen before short
+    DB write transactions.
     """
     meta = provider.model_metadata()
     report = EmbeddingProcessReport(
@@ -117,6 +134,7 @@ def process_embedding_work(
                         "dimension": meta.dimension,
                         "model_id": meta.model_id,
                         "model_revision": meta.model_revision,
+                        "normalizes_embeddings": meta.normalizes_embeddings,
                         "input_hash": item.input_hash,
                         "created_at": now,
                         "indexed_revision": indexed_revision,
@@ -131,9 +149,13 @@ def _row_matches(
     item: EmbeddingWorkRequest,
     meta: EmbeddingModelMetadata,
 ) -> bool:
+    stored_normalize = _as_bool(existing.get("normalizes_embeddings"))
+    if stored_normalize is None:
+        return False
     return (
         str(existing.get("input_hash")) == item.input_hash
         and str(existing.get("model_id")) == meta.model_id
         and int(existing.get("dimension") or 0) == meta.dimension
         and (existing.get("model_revision") == meta.model_revision)
+        and stored_normalize == meta.normalizes_embeddings
     )

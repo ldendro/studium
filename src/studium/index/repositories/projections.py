@@ -11,6 +11,7 @@ from studium.index.normalize import dedupe_aliases_by_normalized
 from studium.index.repositories import aliases as aliases_repo
 from studium.index.repositories import concepts as concepts_repo
 from studium.index.repositories import domains as domains_repo
+from studium.index.repositories import embeddings as embeddings_repo
 from studium.index.repositories import fts as fts_repo
 from studium.index.repositories import indexed_files as indexed_files_repo
 from studium.index.repositories import invalid_records as invalid_records_repo
@@ -68,6 +69,14 @@ def upsert_concept_projection(
     search_documents_repo.upsert_concept_search_document(connection, concept_search_document)
     for module_doc in module_search_documents:
         search_documents_repo.upsert_module_search_document(connection, module_doc)
+
+    # Module rows are delete/reinsert; embeddings are not FK-bound to scaffold_modules.
+    live_module_ids = {str(module["module_id"]) for module in module_rows}
+    embeddings_repo.delete_stale_module_embeddings(
+        connection,
+        parent_concept_id=concept_id,
+        live_module_ids=live_module_ids,
+    )
 
     overview = ""
     fields_raw = concept_search_document.get("field_weights_json")

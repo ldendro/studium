@@ -59,6 +59,21 @@ def list_embeddings_for_owner(
     return [mapping(row) for row in rows]
 
 
+def list_module_embeddings_for_parent(
+    connection: Connection, *, parent_concept_id: str
+) -> list[dict[str, Any]]:
+    rows = connection.execute(
+        select(embeddings)
+        .where(
+            embeddings.c.parent_concept_id == parent_concept_id,
+            embeddings.c.owner_type == "scaffold_module",
+            embeddings.c.embedding_type == "module_semantic",
+        )
+        .order_by(embeddings.c.id)
+    ).all()
+    return [mapping(row) for row in rows]
+
+
 def delete_embedding(connection: Connection, embedding_id: int) -> None:
     connection.execute(delete(embeddings).where(embeddings.c.id == embedding_id))
 
@@ -80,6 +95,23 @@ def delete_embedding_for_key(
             embeddings.c.segment_id == segment,
         )
     )
+
+
+def delete_stale_module_embeddings(
+    connection: Connection,
+    *,
+    parent_concept_id: str,
+    live_module_ids: set[str],
+) -> int:
+    """Delete module_semantic rows for ``parent_concept_id`` whose owner is not live."""
+    deleted = 0
+    for row in list_module_embeddings_for_parent(connection, parent_concept_id=parent_concept_id):
+        owner_id = str(row["owner_id"])
+        if owner_id in live_module_ids:
+            continue
+        delete_embedding(connection, int(row["id"]))
+        deleted += 1
+    return deleted
 
 
 def upsert_embedding(connection: Connection, values: dict[str, Any]) -> int:
