@@ -2,8 +2,18 @@
 
 from __future__ import annotations
 
+from studium.index.config import MAX_MODULE_EMBED_CHARS
 from studium.schemas import ConceptNoteMetadata
 from studium.schemas.scaffold_module import ScaffoldModuleMetadata
+
+
+def truncate_module_body(body: str, *, max_chars: int = MAX_MODULE_EMBED_CHARS) -> str:
+    """Cap module body text included in embedding inputs."""
+    if max_chars <= 0:
+        return ""
+    if len(body) <= max_chars:
+        return body
+    return body[:max_chars]
 
 
 def build_identity_embedding_input(
@@ -42,7 +52,10 @@ def build_module_embedding_input(
     body: str = "",
 ) -> str:
     focus_text = focus or ""
-    return f"Module Title: {title}\nModule Type: {module_type}\nFocus: {focus_text}\nBody: {body}"
+    body_text = truncate_module_body(body)
+    return (
+        f"Module Title: {title}\nModule Type: {module_type}\nFocus: {focus_text}\nBody: {body_text}"
+    )
 
 
 def identity_input_from_metadata(metadata: ConceptNoteMetadata) -> str:

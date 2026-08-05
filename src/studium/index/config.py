@@ -11,8 +11,14 @@ from studium.index.paths import (
     resolve_application_data_dir,
 )
 
-INDEX_SCHEMA_VERSION = 3
+INDEX_SCHEMA_VERSION = 4
 DEFAULT_BUSY_TIMEOUT_MS = 5000
+
+# Phase 2 module embedding input cap (tune after memory benchmarks).
+MAX_MODULE_EMBED_CHARS = 4000
+
+DEFAULT_EMBEDDING_BATCH_SIZE = 32
+DEFAULT_EMBEDDING_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 @dataclass(frozen=True, slots=True)

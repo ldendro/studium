@@ -82,8 +82,22 @@ Library entrypoints:
   alias lookup (no FTS)
 - `studium.index.search_concepts_fts` / `search_modules_fts` — weighted BM25 over FTS5
 - `studium.index.search_concepts_lexical(engine, query)` — lookup first, then FTS
+- `studium.index.process_embedding_work(engine, work, provider)` — batch-embed sync work
+- `studium.index.sync_and_embed(...)` — sync then embed with a provider
+- `studium.index.embed_query(provider, text)` — ephemeral query vector
 
-Lexical search is library-only in this phase (no CLI). Hybrid / vector fusion comes later.
+Lexical search and embedding generation are library-only in this phase (no CLI).
+Vector search / hybrid fusion come in later branches.
+
+Local embedding models (optional):
+
+```bash
+uv sync --extra embeddings
+```
+
+Use `FakeEmbeddingProvider` in tests; `SentenceTransformersEmbeddingProvider` for
+real MiniLM-class models on a machine with the optional extra installed.
+
 ## Project structure
 
 ```
@@ -95,7 +109,7 @@ src/studium/
   validation/     # critical-error / warning validation (P1-B6)
   writes/         # safe write proposals + vault writes (P1-B7)
   cli/            # minimal CLI (P1-B8)
-  index/          # SQLite derived index, sync, lexical search (P2-B02–B04)
+  index/          # SQLite index, sync, lexical search, embeddings (P2-B02–B05)
 tests/            # pytest test suite
 ```
 

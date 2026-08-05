@@ -19,6 +19,9 @@ dev = [
     "pyright[nodejs]>=1.1",
     "pre-commit>=3.7",
 ]
+embeddings = [
+    "sentence-transformers>=3",
+]
 
 [project.scripts]
 studium = "studium.cli.main:main"
@@ -57,3 +60,6 @@ venv = ".venv"
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 addopts = "--cov=studium --cov-report=term-missing"
+markers = [
+    "embedding: real local embedding-model tests (optional deps; not in default CI)",
+]

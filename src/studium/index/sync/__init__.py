@@ -4,6 +4,7 @@ from studium.index.sync.embedding_inputs import (
     build_identity_embedding_input,
     build_module_embedding_input,
     build_semantic_embedding_input,
+    truncate_module_body,
 )
 from studium.index.sync.models import (
     EmbeddingWorkRequest,
@@ -25,4 +26,5 @@ __all__ = [
     "build_semantic_embedding_input",
     "rebuild_vault_index",
     "sync_vault",
+    "truncate_module_body",
 ]
