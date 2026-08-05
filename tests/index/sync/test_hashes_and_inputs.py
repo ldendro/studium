@@ -42,6 +42,27 @@ def test_identity_and_semantic_inputs() -> None:
     assert module.startswith("Module Title: Update")
 
 
+def test_metadata_embedding_inputs_dedupe_normalized_aliases() -> None:
+    from schemas.helpers import build_minimal_concept_note_data
+    from studium.index.sync.embedding_inputs import (
+        identity_input_from_metadata,
+        semantic_input_from_metadata,
+    )
+    from studium.schemas import ConceptNoteMetadata
+
+    metadata = ConceptNoteMetadata.model_validate(
+        build_minimal_concept_note_data(
+            canonical_title="SGD",
+            aliases=["foo-bar", "foo_bar", "Other"],
+        )
+    )
+    identity = identity_input_from_metadata(metadata)
+    assert identity == "Title: SGD\nAliases: foo-bar, Other"
+    semantic = semantic_input_from_metadata(metadata, overview_plaintext="")
+    assert "Aliases: foo-bar, Other" in semantic
+    assert "foo_bar" not in semantic
+
+
 def test_truncate_module_body() -> None:
     assert truncate_module_body("abc", max_chars=10) == "abc"
     assert truncate_module_body("abcdefghij", max_chars=4) == "abcd"

@@ -9,7 +9,11 @@ from studium.index.embeddings.pipeline import (
 )
 from studium.index.embeddings.protocol import EmbeddingModelMetadata, EmbeddingProvider
 from studium.index.embeddings.serialize import pack_vector, unpack_vector
-from studium.index.embeddings.sync_embed import SyncAndEmbedReport, sync_and_embed
+from studium.index.embeddings.sync_embed import (
+    SyncAndEmbedReport,
+    merge_embedding_work,
+    sync_and_embed,
+)
 
 __all__ = [
     "EmbeddingModelMetadata",
@@ -19,6 +23,7 @@ __all__ = [
     "SyncAndEmbedReport",
     "embed_query",
     "enumerate_embedding_work",
+    "merge_embedding_work",
     "pack_vector",
     "process_embedding_work",
     "sync_and_embed",

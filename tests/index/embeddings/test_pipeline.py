@@ -13,6 +13,7 @@ from studium.index import (
     begin_connection,
     embed_query,
     enumerate_embedding_work,
+    merge_embedding_work,
     pack_vector,
     process_embedding_work,
     sync_and_embed,
@@ -361,3 +362,75 @@ def test_removed_module_embedding_is_pruned(
         )
     assert after is None
     assert orphans == []
+
+
+def test_sync_and_enumerate_agree_on_deduped_aliases(
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    path = write_concept_note(
+        vault_root,
+        "concepts/alias.md",
+        id="concept_alias_eeeeee",
+        canonical_title="Alias Host",
+    )
+    note_path = vault_root / path
+    text = note_path.read_text(encoding="utf-8")
+    note_path.write_text(
+        text.replace("aliases: []", "aliases:\n  - foo-bar\n  - foo_bar"),
+        encoding="utf-8",
+    )
+    vault = Vault(vault_root)
+    sync_report = sync_vault(vault, initialized_engine, index_config)
+    sync_identity = next(
+        item for item in sync_report.embedding_work if item.embedding_type == "concept_identity"
+    )
+    enumerated = enumerate_embedding_work(initialized_engine)
+    enum_identity = next(
+        item
+        for item in enumerated
+        if item.owner_id == "concept_alias_eeeeee" and item.embedding_type == "concept_identity"
+    )
+    assert sync_identity.input_text == enum_identity.input_text
+    assert sync_identity.input_hash == enum_identity.input_hash
+    assert "foo-bar" in sync_identity.input_text
+    assert "foo_bar" not in sync_identity.input_text
+
+    merged = merge_embedding_work(enumerated, sync_report.embedding_work)
+    merged_identity = next(
+        item
+        for item in merged
+        if item.owner_id == "concept_alias_eeeeee" and item.embedding_type == "concept_identity"
+    )
+    assert merged_identity.input_hash == sync_identity.input_hash
+
+
+def test_sync_and_embed_skips_on_failed_sync(
+    vault_root: Path,
+    tmp_path: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(
+        vault_root,
+        "concepts/ok.md",
+        id="concept_ok_ffffff",
+        canonical_title="Already Indexed",
+    )
+    vault = Vault(vault_root)
+    sync_and_embed(vault, initialized_engine, index_config, FakeEmbeddingProvider(dimension=4))
+
+    other_root = tmp_path / "other_vault"
+    other_root.mkdir()
+    provider = FakeEmbeddingProvider(dimension=4)
+    report = sync_and_embed(
+        Vault(other_root),
+        initialized_engine,
+        index_config,
+        provider,
+    )
+    assert report.sync.status.value == "failed"
+    assert report.embeddings.requested == 0
+    assert report.embeddings.written == 0
+    assert provider.documents_calls == []

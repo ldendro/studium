@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from studium.index.config import MAX_MODULE_EMBED_CHARS
+from studium.index.normalize import dedupe_aliases_by_normalized
 from studium.schemas import ConceptNoteMetadata
 from studium.schemas.scaffold_module import ScaffoldModuleMetadata
 
@@ -59,9 +60,10 @@ def build_module_embedding_input(
 
 
 def identity_input_from_metadata(metadata: ConceptNoteMetadata) -> str:
+    # Deduped aliases match concept_aliases rows / enumerate_embedding_work.
     return build_identity_embedding_input(
         canonical_title=metadata.canonical_title,
-        aliases=list(metadata.aliases),
+        aliases=dedupe_aliases_by_normalized(list(metadata.aliases)),
     )
 
 
@@ -72,7 +74,7 @@ def semantic_input_from_metadata(
 ) -> str:
     return build_semantic_embedding_input(
         canonical_title=metadata.canonical_title,
-        aliases=list(metadata.aliases),
+        aliases=dedupe_aliases_by_normalized(list(metadata.aliases)),
         concept_type=str(metadata.concept_type),
         domains=list(metadata.concept_domains),
         overview_plaintext=overview_plaintext,

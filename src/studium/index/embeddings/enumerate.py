@@ -22,8 +22,9 @@ def enumerate_embedding_work(engine: Engine) -> list[EmbeddingWorkRequest]:
 
     Used for retry, model-change, and missing-row repair when ``sync_vault``
     emits an empty ``embedding_work`` list because vault files are unchanged.
-    Input texts are reconstructed from indexed columns (matching B03 builders;
-    module body is empty until body extraction is stored in the index).
+    Input texts are reconstructed from indexed columns (matching B03 builders
+    after alias dedupe; module body is empty until body extraction is stored
+    in the index).
     """
     work: list[EmbeddingWorkRequest] = []
     with engine.connect() as connection:
