@@ -13,6 +13,7 @@ pytest.importorskip("sentence_transformers")
 
 from studium.index.embeddings.sentence_transformers_provider import (
     SentenceTransformersEmbeddingProvider,
+    is_commit_sha,
 )
 
 
@@ -25,7 +26,10 @@ def test_sentence_transformers_provider_smoke() -> None:
     )
     meta = provider.model_metadata()
     assert meta.dimension > 0
-    assert meta.model_revision == "main"
+    # Mutable refs must be stored as resolved commit SHAs, not "main".
+    assert meta.model_revision is not None
+    assert meta.model_revision != "main"
+    assert is_commit_sha(meta.model_revision)
     vectors = provider.embed_documents(["gradient descent", "neural network"])
     assert len(vectors) == 2
     assert len(vectors[0]) == meta.dimension

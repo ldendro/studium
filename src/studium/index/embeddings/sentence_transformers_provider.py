@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, cast
 
 from studium.index.embeddings.protocol import EmbeddingModelMetadata
+
+_COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$", re.IGNORECASE)
 
 
 class SentenceTransformersEmbeddingProvider:
@@ -13,6 +16,9 @@ class SentenceTransformersEmbeddingProvider:
     Requires ``sentence-transformers`` (and its torch dependency). Constructing
     this class without the optional extra raises ``ImportError`` with install
     guidance.
+
+    ``model_revision`` in metadata is always a resolved Hub commit SHA when
+    discovery succeeds — never a mutable ref such as ``main``.
     """
 
     def __init__(
@@ -44,10 +50,9 @@ class SentenceTransformersEmbeddingProvider:
         model = cast(Any, SentenceTransformer(model_id, **kwargs))
         self._model: Any = model
         dim = int(model.get_sentence_embedding_dimension())
-        resolved_revision = revision if revision is not None else _discover_model_revision(model_id)
         self._metadata = EmbeddingModelMetadata(
             model_id=model_id,
-            model_revision=resolved_revision,
+            model_revision=resolve_model_revision(model_id, revision=revision),
             dimension=dim,
             normalizes_embeddings=normalize_embeddings,
             max_input_chars=None,
@@ -73,14 +78,38 @@ class SentenceTransformersEmbeddingProvider:
         return self.embed_documents([text])[0]
 
 
-def _discover_model_revision(model_id: str) -> str | None:
-    """Resolve the Hub commit SHA for ``model_id`` when huggingface_hub is available."""
+def is_commit_sha(revision: str) -> bool:
+    """Return True when ``revision`` looks like a git/Hub commit SHA."""
+    return bool(_COMMIT_SHA_RE.fullmatch(revision.strip()))
+
+
+def resolve_model_revision(model_id: str, *, revision: str | None = None) -> str | None:
+    """Resolve a Hub revision ref to a commit SHA.
+
+    Mutable refs (``main``, branch names, tags) are resolved via
+    ``huggingface_hub.model_info``. Already-SHA values are returned as-is when
+    discovery is unavailable. Unresolved mutable refs return ``None`` so they
+    are not persisted as stable model identity.
+    """
+    discovered = discover_model_revision(model_id, revision=revision)
+    if discovered is not None:
+        return discovered
+    if revision is not None and is_commit_sha(revision):
+        return revision.strip().lower()
+    return None
+
+
+def discover_model_revision(model_id: str, *, revision: str | None = None) -> str | None:
+    """Look up the Hub commit SHA for ``model_id`` at ``revision`` (default tip)."""
     try:
         from huggingface_hub import model_info  # type: ignore[import-not-found]
     except ImportError:
         return None
     try:
-        info = cast(Any, model_info(model_id))
+        if revision is None:
+            info = cast(Any, model_info(model_id))
+        else:
+            info = cast(Any, model_info(model_id, revision=revision))
     except Exception:
         return None
     sha = getattr(info, "sha", None)
