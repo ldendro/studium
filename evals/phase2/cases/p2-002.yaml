@@ -1,0 +1,14 @@
+case_id: p2-002
+query: Exact Title 2
+domain: systems
+acceptable_actions:
+- use_existing_concept
+- create_new_concept
+required_candidate_ids: []
+prohibited_identity_ids: []
+expected_resolution_states:
+- exact_match
+- no_results
+- related_results
+notes: Synthetic Phase 2 eval fixture; acceptable actions are soft targets for harness
+  wiring.

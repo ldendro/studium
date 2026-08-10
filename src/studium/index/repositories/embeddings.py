@@ -74,6 +74,41 @@ def list_module_embeddings_for_parent(
     return [mapping(row) for row in rows]
 
 
+def list_embeddings_for_search(
+    connection: Connection,
+    *,
+    embedding_type: str,
+    model_id: str,
+    dimension: int,
+    model_revision: str | None = None,
+    normalizes_embeddings: bool = True,
+) -> list[dict[str, Any]]:
+    """Load searchable embedding rows for one type in a single model space.
+
+    Excludes B05 rejection sentinels (``dimension == 0``) and rows outside the
+    requested ``(model_id, model_revision, dimension, normalizes_embeddings)``.
+    """
+    if dimension <= 0:
+        return []
+    conditions = [
+        embeddings.c.embedding_type == embedding_type,
+        embeddings.c.model_id == model_id,
+        embeddings.c.dimension == dimension,
+        embeddings.c.dimension > 0,
+        embeddings.c.normalizes_embeddings == normalizes_embeddings,
+    ]
+    if model_revision is None:
+        conditions.append(embeddings.c.model_revision.is_(None))
+    else:
+        conditions.append(embeddings.c.model_revision == model_revision)
+    rows = connection.execute(
+        select(embeddings)
+        .where(*conditions)
+        .order_by(embeddings.c.owner_id, embeddings.c.segment_id)
+    ).all()
+    return [mapping(row) for row in rows]
+
+
 def delete_embedding(connection: Connection, embedding_id: int) -> None:
     connection.execute(delete(embeddings).where(embeddings.c.id == embedding_id))
 

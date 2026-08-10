@@ -234,7 +234,22 @@ def _module_search_text(title: str, module_type: str, focus: str | None) -> str:
 
 
 def _encounter_row(concept_id: str, encounter: Any) -> dict[str, Any]:
+    from studium.index.graph.encounters import (
+        build_encounter_fingerprint,
+        normalize_source_identity,
+    )
+
     external = encounter.source.external_id
+    identity = normalize_source_identity(
+        source_type=str(encounter.source.type),
+        source_title=encounter.source.title,
+        unit_type=encounter.source.unit_type,
+        unit=encounter.source.unit,
+        section=encounter.source.section,
+        link=encounter.source.link,
+        external_id_type=None if external is None else external.type,
+        external_id_value=None if external is None else external.value,
+    )
     return {
         "concept_id": concept_id,
         "source_type": str(encounter.source.type),
@@ -249,7 +264,7 @@ def _encounter_row(concept_id: str, encounter: Any) -> dict[str, Any]:
         "contribution_status": str(encounter.contribution_status),
         "content_attached": bool(encounter.content_attached),
         "content_id": encounter.content_id,
-        "fingerprint": None,
+        "fingerprint": build_encounter_fingerprint(identity),
     }
 
 

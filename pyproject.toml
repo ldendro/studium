@@ -9,6 +9,7 @@ dependencies = [
     "pyyaml>=6",
     "sqlalchemy>=2",
     "platformdirs>=4",
+    "numpy>=2",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +22,9 @@ dev = [
 ]
 embeddings = [
     "sentence-transformers>=3",
+]
+vector-ext = [
+    "sqlite-vec>=0.1.6",
 ]
 
 [project.scripts]
@@ -59,7 +63,9 @@ venv = ".venv"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
-addopts = "--cov=studium --cov-report=term-missing -m 'not embedding'"
+addopts = "--cov=studium --cov-report=term-missing -m 'not embedding and not vector_ext and not llm'"
 markers = [
     "embedding: real local embedding-model tests (optional deps; opt-in via pytest -m embedding)",
+    "vector_ext: optional sqlite-vec backend tests (uv sync --extra vector-ext)",
+    "llm: live OpenAI-compatible local LLM server tests (opt-in via pytest -m llm)",
 ]

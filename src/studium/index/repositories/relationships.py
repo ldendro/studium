@@ -27,6 +27,16 @@ def list_relationships_for_source(
     return [mapping(row) for row in rows]
 
 
+def list_relationships_for_target(connection: Connection, target_id: str) -> list[dict[str, Any]]:
+    """Relationships that point at ``target_id`` (for derived inverses)."""
+    rows = connection.execute(
+        select(relationships)
+        .where(relationships.c.target_id == target_id)
+        .order_by(relationships.c.id)
+    ).all()
+    return [mapping(row) for row in rows]
+
+
 def delete_relationships_for_source(connection: Connection, source_concept_id: str) -> None:
     connection.execute(
         delete(relationships).where(relationships.c.source_concept_id == source_concept_id)

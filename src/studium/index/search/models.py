@@ -112,3 +112,148 @@ class LexicalSearchResult(BaseModel):
     module_hits: list[LexicalModuleHit] = Field(default_factory=_empty_module_hits)
     warnings: list[str] = Field(default_factory=_empty_strings)
     diagnostics: dict[str, Any] = Field(default_factory=_empty_diagnostics)
+
+
+class SearchStatus(StrEnum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    FALLBACK = "fallback"
+
+
+class SearchChannel(StrEnum):
+    FTS = "fts"
+    IDENTITY_VECTOR = "identity_vector"
+    SEMANTIC_VECTOR = "semantic_vector"
+    MODULE_VECTOR = "module_vector"
+
+
+class ConceptSearchFilters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    domains: list[str] = Field(default_factory=_empty_strings)
+    concept_types: list[str] = Field(default_factory=_empty_strings)
+    vault_statuses: list[str] = Field(default_factory=_empty_strings)
+    review_statuses: list[str] = Field(default_factory=_empty_strings)
+
+
+class ConceptSearchLimits(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    concepts: int = 20
+    modules: int = 20
+    channel: int = 50
+
+
+class ConceptSearchQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str
+    filters: ConceptSearchFilters = Field(default_factory=ConceptSearchFilters)
+    limits: ConceptSearchLimits = Field(default_factory=ConceptSearchLimits)
+    include_modules: bool = True
+    include_diagnostics: bool = False
+
+
+class ChannelContribution(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel: SearchChannel
+    rank: int
+    score: float | None = None
+
+
+class SearchEvidenceItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_type: str
+    summary: str
+    concept_id: str | None = None
+    module_id: str | None = None
+    details: dict[str, Any] = Field(default_factory=_empty_diagnostics)
+
+
+def _empty_channels() -> list[ChannelContribution]:
+    return []
+
+
+def _empty_evidence() -> list[SearchEvidenceItem]:
+    return []
+
+
+class RankedModuleMatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_id: str
+    title: str
+    module_type: str | None = None
+    segment_id: str = ""
+    heading: str | None = None
+    anchor: str | None = None
+    channels: list[ChannelContribution] = Field(default_factory=_empty_channels)
+    fused_score: float = 0.0
+
+
+def _empty_module_matches() -> list[RankedModuleMatch]:
+    return []
+
+
+class RankedConceptCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    concept_id: str
+    canonical_title: str
+    aliases: list[str] = Field(default_factory=_empty_strings)
+    concept_type: str | None = None
+    domains: list[str] = Field(default_factory=_empty_strings)
+    overview_excerpt: str | None = None
+    status: str | None = None
+    vault_status: str | None = None
+    review_status: str | None = None
+    channels: list[ChannelContribution] = Field(default_factory=_empty_channels)
+    matched_fields: list[str] = Field(default_factory=_empty_strings)
+    fused_rank: int
+    fused_score: float
+    matching_modules: list[RankedModuleMatch] = Field(default_factory=_empty_module_matches)
+    evidence: list[SearchEvidenceItem] = Field(default_factory=_empty_evidence)
+
+
+class HybridModuleHit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_id: str
+    concept_id: str
+    parent_canonical_title: str | None = None
+    title: str
+    module_type: str | None = None
+    segment_id: str = ""
+    heading: str | None = None
+    anchor: str | None = None
+    channels: list[ChannelContribution] = Field(default_factory=_empty_channels)
+    fused_rank: int
+    fused_score: float
+    snippet: str | None = None
+
+
+def _empty_ranked_concepts() -> list[RankedConceptCandidate]:
+    return []
+
+
+def _empty_hybrid_modules() -> list[HybridModuleHit]:
+    return []
+
+
+class ConceptSearchResult(BaseModel):
+    """Stable hybrid search contract for Phase 3 and recommendations (B07)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query: ConceptSearchQuery
+    index_revision: int
+    search_status: SearchStatus
+    resolution_state: ResolutionState
+    exact_matches: list[IdentityMatch] = Field(default_factory=_empty_identity_matches)
+    ranked_concepts: list[RankedConceptCandidate] = Field(default_factory=_empty_ranked_concepts)
+    module_hits: list[HybridModuleHit] = Field(default_factory=_empty_hybrid_modules)
+    evidence: list[SearchEvidenceItem] = Field(default_factory=_empty_evidence)
+    warnings: list[str] = Field(default_factory=_empty_strings)
+    diagnostics: dict[str, Any] = Field(default_factory=_empty_diagnostics)

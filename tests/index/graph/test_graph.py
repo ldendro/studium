@@ -1,0 +1,154 @@
+"""Tests for graph queries and encounter matching."""
+
+from __future__ import annotations
+
+from sqlalchemy.engine import Engine
+
+from studium.index import begin_connection
+from studium.index.graph import (
+    EncounterOutcome,
+    build_encounter_fingerprint,
+    compare_learning_encounter,
+    derive_inverse_relationship_type,
+    get_one_hop_neighborhood,
+    get_prerequisites,
+    normalize_source_identity,
+)
+from studium.index.repositories import concepts, learning_encounters, relationships
+
+
+def _upsert_concept(engine: Engine, concept_id: str, title: str) -> None:
+    with begin_connection(engine) as connection:
+        concepts.upsert_concept(
+            connection,
+            {
+                "concept_id": concept_id,
+                "canonical_title": title,
+                "concept_type": "atomic_concept",
+                "status": "active",
+                "review_status": "draft",
+                "vault_status": "active",
+                "file_path": f"concepts/{concept_id}.md",
+                "note_schema_version": 2,
+                "validity_state": "valid",
+                "indexed_revision": 1,
+                "note_created_at": "2026-01-01T00:00:00Z",
+                "note_updated_at": "2026-01-01T00:00:00Z",
+            },
+        )
+
+
+def test_inverse_types() -> None:
+    assert derive_inverse_relationship_type("depends_on") == "prerequisite_for"
+    assert derive_inverse_relationship_type("parent_of") == "child_of"
+
+
+def test_one_hop_and_prerequisites(initialized_engine: Engine) -> None:
+    _upsert_concept(initialized_engine, "concept_backprop", "Backpropagation")
+    _upsert_concept(initialized_engine, "concept_chain", "Chain Rule")
+    with begin_connection(initialized_engine) as connection:
+        relationships.insert_relationship(
+            connection,
+            {
+                "source_concept_id": "concept_backprop",
+                "relationship_type": "depends_on",
+                "target_id": "concept_chain",
+                "target_title": "Chain Rule",
+                "vault_status": "found",
+                "learning_role": "mathematical_prerequisite",
+                "confidence": "high",
+                "status": "user_confirmed",
+            },
+        )
+    prereqs = get_prerequisites(initialized_engine, "concept_backprop")
+    assert len(prereqs) == 1
+    assert prereqs[0].target_id == "concept_chain"
+
+    neighborhood = get_one_hop_neighborhood(initialized_engine, "concept_chain")
+    assert neighborhood.incoming_derived
+    assert neighborhood.incoming_derived[0].derived_inverse is True
+    assert neighborhood.incoming_derived[0].relationship_type == "prerequisite_for"
+    assert neighborhood.incoming_derived[0].target_id == "concept_backprop"
+
+
+def test_encounter_outcomes(initialized_engine: Engine) -> None:
+    _upsert_concept(initialized_engine, "concept_sgd", "SGD")
+    base = normalize_source_identity(
+        source_type="book",
+        source_title="Hands-On Machine Learning",
+    )
+    enriched = normalize_source_identity(
+        source_type="book",
+        source_title="Hands-On Machine Learning",
+        unit="Chapter 4",
+    )
+    other_unit = normalize_source_identity(
+        source_type="book",
+        source_title="Hands-On Machine Learning",
+        unit="Chapter 6",
+    )
+    other_book = normalize_source_identity(
+        source_type="book",
+        source_title="Deep Learning Book",
+    )
+
+    with begin_connection(initialized_engine) as connection:
+        learning_encounters.insert_learning_encounter(
+            connection,
+            {
+                "concept_id": "concept_sgd",
+                "source_type": "book",
+                "source_title": "Hands-On Machine Learning",
+                "unit_type": None,
+                "unit": None,
+                "section": None,
+                "link": None,
+                "external_id_type": None,
+                "external_id_value": None,
+                "role": "primary",
+                "contribution_status": "pending",
+                "content_attached": False,
+                "content_id": None,
+                "fingerprint": build_encounter_fingerprint(base),
+            },
+        )
+
+    exact = compare_learning_encounter(initialized_engine, concept_id="concept_sgd", candidate=base)
+    assert exact.outcome == EncounterOutcome.EXACT_SAME_ENCOUNTER
+
+    enrich = compare_learning_encounter(
+        initialized_engine, concept_id="concept_sgd", candidate=enriched
+    )
+    assert enrich.outcome == EncounterOutcome.SAME_SOURCE_ENRICH_EXISTING
+
+    # Seed unit Chapter 4 then compare Chapter 6
+    with begin_connection(initialized_engine) as connection:
+        learning_encounters.delete_encounters_for_concept(connection, "concept_sgd")
+        learning_encounters.insert_learning_encounter(
+            connection,
+            {
+                "concept_id": "concept_sgd",
+                "source_type": "book",
+                "source_title": "Hands-On Machine Learning",
+                "unit_type": None,
+                "unit": "Chapter 4",
+                "section": None,
+                "link": None,
+                "external_id_type": None,
+                "external_id_value": None,
+                "role": "primary",
+                "contribution_status": "pending",
+                "content_attached": False,
+                "content_id": None,
+                "fingerprint": build_encounter_fingerprint(enriched),
+            },
+        )
+    new_unit = compare_learning_encounter(
+        initialized_engine, concept_id="concept_sgd", candidate=other_unit
+    )
+    assert new_unit.outcome == EncounterOutcome.SAME_SOURCE_NEW_UNIT
+
+    different = compare_learning_encounter(
+        initialized_engine, concept_id="concept_sgd", candidate=other_book
+    )
+    assert different.outcome == EncounterOutcome.DIFFERENT_SOURCE

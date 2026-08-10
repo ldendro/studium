@@ -20,6 +20,22 @@ MAX_MODULE_EMBED_CHARS = 4000
 DEFAULT_EMBEDDING_BATCH_SIZE = 32
 DEFAULT_EMBEDDING_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
 
+# Empirically selected default (see P2-B06 Implementation Notes).
+DEFAULT_VECTOR_BACKEND = "numpy"
+
+# Weighted reciprocal rank fusion (B07; tunable via evaluation harness).
+DEFAULT_RRF_CONSTANT = 60.0
+DEFAULT_RRF_WEIGHTS: dict[str, float] = {
+    "fts": 1.0,
+    "identity_vector": 1.0,
+    "semantic_vector": 1.2,
+    "module_vector": 0.8,
+}
+
+# Default OpenAI-compatible local reasoning model (B10).
+DEFAULT_REASONING_MODEL = "llama3.2:3b"
+DEFAULT_LLM_BASE_URL = "http://127.0.0.1:11434/v1"
+
 
 @dataclass(frozen=True, slots=True)
 class IndexConfig:
