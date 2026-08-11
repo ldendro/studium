@@ -37,6 +37,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/studium"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"evals/phase2/cases" = "studium/evaluate/cases"
+
 [tool.ruff]
 src = ["src", "tests"]
 line-length = 100
