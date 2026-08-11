@@ -14,6 +14,7 @@ from studium.index.graph.inverses import (
     derive_inverse_relationship_type,
 )
 from studium.index.graph.models import GraphRelationship, OneHopNeighborhood
+from studium.index.repositories import concepts as concepts_repo
 from studium.index.repositories import relationships as relationships_repo
 
 
@@ -88,13 +89,13 @@ def get_parent_child_candidates(
     concept_id: str,
 ) -> dict[str, list[GraphRelationship]]:
     neighborhood = get_one_hop_neighborhood(engine, concept_id)
-    parents = [
+    children = [
         rel
         for rel in [*neighborhood.outgoing, *neighborhood.incoming_derived]
         if rel.relationship_type in PARENT_TYPES
         or (rel.derived_inverse and rel.original_relationship_type in CHILD_TYPES)
     ]
-    children = [
+    parents = [
         rel
         for rel in [*neighborhood.outgoing, *neighborhood.incoming_derived]
         if rel.relationship_type in CHILD_TYPES
@@ -140,7 +141,7 @@ def derive_inverse_relationship(
         source_concept_id=viewer_concept_id,
         relationship_type=inverse,
         target_id=str(row["source_concept_id"]),
-        target_title=str(row["source_concept_id"]),
+        target_title=str(row.get("source_title") or row["source_concept_id"]),
         vault_status=str(row["vault_status"]),
         learning_role=str(row["learning_role"]),
         confidence=str(row["confidence"]),
@@ -153,4 +154,10 @@ def derive_inverse_relationship(
 def _incoming_derived(engine: Engine, concept_id: str) -> list[GraphRelationship]:
     with engine.connect() as connection:
         rows = relationships_repo.list_relationships_for_target(connection, concept_id)
-    return [derive_inverse_relationship(row, viewer_concept_id=concept_id) for row in rows]
+        enriched: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            source = concepts_repo.get_concept(connection, str(row["source_concept_id"]))
+            item["source_title"] = source["canonical_title"] if source else row["source_concept_id"]
+            enriched.append(item)
+    return [derive_inverse_relationship(row, viewer_concept_id=concept_id) for row in enriched]
