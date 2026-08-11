@@ -340,7 +340,7 @@ def _tier1_hybrid(
     ranked_concepts: list[RankedConceptCandidate] = []
     evidence: list[SearchEvidenceItem] = []
     for fused_rank, (concept_id, fused_score) in enumerate(fused, start=1):
-        if fused_rank > limits.concepts:
+        if len(ranked_concepts) >= limits.concepts:
             break
         candidate = _enrich_concept(
             engine,
