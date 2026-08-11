@@ -46,7 +46,13 @@ def _alias_collision(engine: Engine, alias: str, *, target_concept_id: str) -> l
     normalized = normalize_title(alias)
     with engine.connect() as connection:
         rows = aliases.list_aliases_by_normalized_alias(connection, normalized)
-    return [str(row["concept_id"]) for row in rows if str(row["concept_id"]) != target_concept_id]
+        title_rows = concepts.list_concepts_by_normalized_title(connection, normalized)
+    ids = {
+        str(row["concept_id"])
+        for row in [*rows, *title_rows]
+        if str(row["concept_id"]) != target_concept_id
+    }
+    return sorted(ids)
 
 
 def assemble_recommendation_failure(
@@ -90,6 +96,78 @@ def recommend(
     """Assemble a recommendation from search (+ optional LLM), without mutating notes."""
     query_text = search.query.text
     revision = search.index_revision
+
+    exact_match = search.exact_matches[0] if search.exact_matches else None
+    intent_target_id = (
+        exact_match.concept_id
+        if exact_match is not None
+        else search.ranked_concepts[0].concept_id
+        if search.ranked_concepts
+        else None
+    )
+
+    # Explicit source intent takes precedence over generic exact reuse.
+    if (
+        source_type
+        and source_title
+        and intent_target_id
+        and _concept_exists(engine, intent_target_id)
+    ):
+        candidate = normalize_source_identity(
+            source_type=source_type, source_title=source_title, unit=unit
+        )
+        comparison = compare_learning_encounter(
+            engine, concept_id=intent_target_id, candidate=candidate
+        )
+        if comparison.outcome == EncounterOutcome.EXACT_SAME_ENCOUNTER:
+            return MarkRedundantRecommendation(
+                confidence=ConfidenceLevel.HIGH,
+                completion_status=CompletionStatus.COMPLETE,
+                reasoning_mode=ReasoningMode.DETERMINISTIC,
+                index_revision=revision,
+                evidence=["exact_same_encounter"],
+                target_concept_id=intent_target_id,
+                reason="Learning encounter already indexed",
+            )
+        if comparison.outcome == EncounterOutcome.SAME_SOURCE_ENRICH_EXISTING:
+            assert comparison.matched_encounter_id is not None
+            return UpdateLearningEncounterRecommendation(
+                confidence=ConfidenceLevel.HIGH,
+                completion_status=CompletionStatus.COMPLETE,
+                reasoning_mode=ReasoningMode.DETERMINISTIC,
+                index_revision=revision,
+                evidence=["same_source_enrich_existing"],
+                target_concept_id=intent_target_id,
+                existing_encounter_id=comparison.matched_encounter_id,
+                enrichment_fields=["unit"] if unit else [],
+                comparison_outcome=comparison.outcome.value,
+            )
+        return AddLearningEncounterRecommendation(
+            confidence=ConfidenceLevel.MEDIUM,
+            completion_status=CompletionStatus.COMPLETE,
+            reasoning_mode=ReasoningMode.DETERMINISTIC,
+            index_revision=revision,
+            evidence=[comparison.outcome.value],
+            target_concept_id=intent_target_id,
+            source_type=source_type,
+            source_title=source_title,
+            unit=unit,
+            comparison_outcome=comparison.outcome.value,
+        )
+
+    # Explicit module intent also takes precedence over generic exact reuse.
+    if module_intent and intent_target_id and _concept_exists(engine, intent_target_id):
+        return AddScaffoldModuleRecommendation(
+            confidence=ConfidenceLevel.MEDIUM,
+            completion_status=CompletionStatus.COMPLETE,
+            reasoning_mode=ReasoningMode.DETERMINISTIC,
+            index_revision=revision,
+            evidence=["module_intent_target"],
+            target_concept_id=intent_target_id,
+            module_type="derivation",
+            module_title=query_text[:80] or "New module",
+            focus=None,
+        )
 
     # Exact identity → use existing
     if search.resolution_state == ResolutionState.EXACT_MATCH and search.exact_matches:
@@ -211,6 +289,9 @@ def recommend(
         if (
             decision.classification == IdentityClassification.SAME_CONCEPT
             and decision.selected_concept_id
+            and decision.selected_concept_id
+            in {m.concept_id for m in search.exact_matches}
+            | {candidate.concept_id for candidate in search.ranked_concepts}
             and _concept_exists(engine, decision.selected_concept_id)
         ):
             return UseExistingConceptRecommendation(
@@ -266,7 +347,7 @@ def recommend(
         return _fallback_create_new(search, query_text, revision)
     if search.ranked_concepts:
         top = search.ranked_concepts[0]
-        if _concept_exists(engine, top.concept_id) and top.fused_score > 0.02:
+        if _concept_exists(engine, top.concept_id) and top.channels:
             return UseExistingConceptRecommendation(
                 confidence=ConfidenceLevel.LOW,
                 completion_status=CompletionStatus.FALLBACK,
@@ -326,6 +407,19 @@ def assemble_alias_suggestion(
             stage=FailureStage.DETERMINISTIC_VERIFICATION,
             error_code="missing_target_concept",
             message=f"Target concept {target_concept_id} not found",
+        )
+    from studium.index.normalize import normalize_title
+
+    with engine.connect() as connection:
+        target = concepts.get_concept(connection, target_concept_id)
+    assert target is not None
+    if normalize_title(alias) == str(target["normalized_title"]):
+        return assemble_recommendation_failure(
+            query=alias,
+            index_revision=0,
+            stage=FailureStage.DETERMINISTIC_VERIFICATION,
+            error_code="alias_matches_target_title",
+            message="Alias must differ from the target concept's canonical title",
         )
     collisions = _alias_collision(engine, alias, target_concept_id=target_concept_id)
     warnings_evidence = list(evidence or [])
