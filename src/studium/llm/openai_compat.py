@@ -34,13 +34,18 @@ class OpenAICompatibleProvider:
                 self._request("GET", "/models", body=None, timeout_seconds=5.0),
             )
             data = payload.get("data")
-            count = len(cast(list[Any], data)) if isinstance(data, list) else 0
+            models = cast(list[Any], data) if isinstance(data, list) else []
+            model_objects = [
+                cast(dict[str, Any], item) for item in models if isinstance(item, dict)
+            ]
+            model_ids = {str(item["id"]) for item in model_objects if item.get("id") is not None}
+            ready = self._model_id in model_ids
             return ProviderHealth(
                 healthy=True,
-                ready=True,
+                ready=ready,
                 model_id=self._model_id,
-                message="reachable",
-                details={"model_count": count},
+                message="reachable" if ready else f"Model {self._model_id!r} is not available",
+                details={"model_count": len(models), "model_ids": sorted(model_ids)},
             )
         except Exception as exc:
             return ProviderHealth(
