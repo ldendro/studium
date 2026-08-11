@@ -133,7 +133,7 @@ def compare_against_rows(
         stored = row.get("fingerprint")
         if row_encounter_fp == encounter_fp or (stored is not None and str(stored) == encounter_fp):
             exact_matches.append(row)
-        elif row_source_only == source_fp:
+        elif row_source_only == source_fp or _same_source_by_fallback(identity, candidate):
             same_source.append(row)
 
     if len(exact_matches) == 1:
@@ -222,6 +222,20 @@ def _is_enrichment(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
     unit_enrich = not existing.unit and bool(candidate.unit)
     section_enrich = not existing.section and bool(candidate.section)
     return compatible and (unit_enrich or section_enrich)
+
+
+def _same_source_by_fallback(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
+    same_title = (
+        existing.source_type == candidate.source_type
+        and existing.source_title == candidate.source_title
+    )
+    if not same_title:
+        return False
+    existing_external = (existing.external_id_type, existing.external_id_value)
+    candidate_external = (candidate.external_id_type, candidate.external_id_value)
+    if all(existing_external) and all(candidate_external):
+        return existing_external == candidate_external
+    return True
 
 
 def _unit_differs(existing: SourceIdentity, candidate: SourceIdentity) -> bool:

@@ -11,6 +11,7 @@ from studium.index.graph.inverses import (
     PARENT_TYPES,
     PREREQUISITE_TYPES,
     VARIANT_TYPES,
+    derive_inverse_learning_role,
     derive_inverse_relationship_type,
 )
 from studium.index.graph.models import GraphRelationship, OneHopNeighborhood
@@ -68,10 +69,11 @@ def get_relationships_grouped_by_learning_role(
 
 
 def get_prerequisites(engine: Engine, concept_id: str) -> list[GraphRelationship]:
-    """Concepts this concept ``depends_on`` (outgoing prerequisites)."""
+    """Concepts this concept depends on, regardless of stored edge orientation."""
+    neighborhood = get_one_hop_neighborhood(engine, concept_id)
     return [
         rel
-        for rel in get_direct_relationships(engine, concept_id)
+        for rel in [*neighborhood.outgoing, *neighborhood.incoming_derived]
         if rel.relationship_type in PREREQUISITE_TYPES
     ]
 
@@ -145,7 +147,7 @@ def derive_inverse_relationship(
         target_id=str(row["source_concept_id"]),
         target_title=str(row.get("source_title") or row["source_concept_id"]),
         vault_status=str(row["vault_status"]),
-        learning_role=str(row["learning_role"]),
+        learning_role=derive_inverse_learning_role(str(row["learning_role"])),
         confidence=str(row["confidence"]),
         status=str(row["status"]),
         derived_inverse=True,

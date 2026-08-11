@@ -82,26 +82,30 @@ def search_concepts(
         match = identity.unique_match
         assert match is not None
         candidate = _load_ranked_exact(engine, match)
-        evidence = [
-            SearchEvidenceItem(
-                evidence_type="exact_identity",
-                summary=f"Exact {match.match_type.value} match",
-                concept_id=match.concept_id,
-                details={"match_type": match.match_type.value},
+        if candidate is not None and not _passes_filters(candidate, search_query):
+            warnings.append("Exact identity match excluded by query filters.")
+            diagnostics["exact_match_filtered"] = True
+        else:
+            evidence = [
+                SearchEvidenceItem(
+                    evidence_type="exact_identity",
+                    summary=f"Exact {match.match_type.value} match",
+                    concept_id=match.concept_id,
+                    details={"match_type": match.match_type.value},
+                )
+            ]
+            return ConceptSearchResult(
+                query=search_query,
+                index_revision=revision,
+                search_status=SearchStatus.COMPLETE,
+                resolution_state=ResolutionState.EXACT_MATCH,
+                exact_matches=[match],
+                ranked_concepts=[candidate] if candidate is not None else [],
+                module_hits=[],
+                evidence=evidence,
+                warnings=warnings,
+                diagnostics=diagnostics if search_query.include_diagnostics else {},
             )
-        ]
-        return ConceptSearchResult(
-            query=search_query,
-            index_revision=revision,
-            search_status=SearchStatus.COMPLETE,
-            resolution_state=ResolutionState.EXACT_MATCH,
-            exact_matches=[match],
-            ranked_concepts=[candidate] if candidate is not None else [],
-            module_hits=[],
-            evidence=evidence,
-            warnings=warnings,
-            diagnostics=diagnostics if search_query.include_diagnostics else {},
-        )
 
     if identity.is_ambiguous:
         warnings.append(
@@ -158,9 +162,16 @@ def _tier1_hybrid(
     semantic_hits: list[VectorConceptHit] = []
     module_vector_hits: list[VectorModuleHit] = []
 
-    identity_vec, semantic_vec, model_filter, vector_ready = _resolve_query_vectors(
-        search_query.text, options
-    )
+    try:
+        identity_vec, semantic_vec, model_filter, vector_ready = _resolve_query_vectors(
+            search_query.text, options
+        )
+    except Exception as exc:
+        identity_vec = semantic_vec = None
+        model_filter = None
+        vector_ready = False
+        channel_errors.append(f"query_embedding_failed: {exc}")
+        warnings.append("Query embedding failed; using FTS-only results.")
     if not vector_ready:
         status = SearchStatus.PARTIAL
         warnings.append(
@@ -172,44 +183,52 @@ def _tier1_hybrid(
         assert model_filter is not None
         assert identity_vec is not None
         assert semantic_vec is not None
-        try:
-            with ThreadPoolExecutor(max_workers=3) as pool:
-                fut_id = pool.submit(
-                    search_concept_identity_vectors,
-                    engine,
-                    identity_vec,
-                    model_filter,
-                    limit=channel_limit,
-                    backend=options.vector_backend,
-                )
-                fut_sem = pool.submit(
-                    search_concept_semantic_vectors,
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            fut_id = pool.submit(
+                search_concept_identity_vectors,
+                engine,
+                identity_vec,
+                model_filter,
+                limit=channel_limit,
+                backend=options.vector_backend,
+            )
+            fut_sem = pool.submit(
+                search_concept_semantic_vectors,
+                engine,
+                semantic_vec,
+                model_filter,
+                limit=channel_limit,
+                backend=options.vector_backend,
+            )
+            fut_mod = None
+            if search_query.include_modules:
+                fut_mod = pool.submit(
+                    search_module_semantic_vectors,
                     engine,
                     semantic_vec,
                     model_filter,
                     limit=channel_limit,
                     backend=options.vector_backend,
                 )
-                fut_mod = None
-                if search_query.include_modules:
-                    fut_mod = pool.submit(
-                        search_module_semantic_vectors,
-                        engine,
-                        semantic_vec,
-                        model_filter,
-                        limit=channel_limit,
-                        backend=options.vector_backend,
-                    )
+            try:
                 identity_hits = fut_id.result()
+            except Exception as exc:
+                channel_errors.append(f"identity_vector_failed: {exc}")
+            try:
                 semantic_hits = fut_sem.result()
-                if fut_mod is not None:
+            except Exception as exc:
+                channel_errors.append(f"semantic_vector_failed: {exc}")
+            if fut_mod is not None:
+                try:
                     module_vector_hits = fut_mod.result()
-            diagnostics["vector_channels"] = "ok"
-        except Exception as exc:
+                except Exception as exc:
+                    channel_errors.append(f"module_vector_failed: {exc}")
+        if channel_errors:
             status = SearchStatus.PARTIAL
-            channel_errors.append(f"vector_search_failed: {exc}")
             warnings.append("One or more vector channels failed; using available channels.")
-            diagnostics["vector_channels"] = "failed"
+            diagnostics["vector_channels"] = "partial"
+        else:
+            diagnostics["vector_channels"] = "ok"
 
     if channel_errors:
         diagnostics["channel_errors"] = channel_errors

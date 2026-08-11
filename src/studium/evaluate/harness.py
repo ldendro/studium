@@ -144,6 +144,13 @@ def run_recommendation_evaluation(
             continue
         action = outcome.action
         action_ok = not case.acceptable_actions or action in case.acceptable_actions
+        target_id = getattr(outcome, "target_concept_id", None)
+        if target_id is not None:
+            action_ok = (
+                action_ok
+                and (not case.required_candidate_ids or target_id in case.required_candidate_ids)
+                and target_id not in case.prohibited_identity_ids
+            )
         results.append(
             RecommendationCaseResult(
                 case_id=case.case_id,
@@ -173,7 +180,13 @@ def generate_evaluation_report(
     exact_ok = 0
     for case in exact_cases:
         match = next((r for r in retrieval if r.case_id == case.case_id), None)
-        if match and match.resolution_state == ResolutionState.EXACT_MATCH.value:
+        exact_id = match.ranked_ids[0] if match and match.ranked_ids else None
+        if (
+            match
+            and match.resolution_state == ResolutionState.EXACT_MATCH.value
+            and (not case.required_candidate_ids or exact_id in case.required_candidate_ids)
+            and exact_id not in case.prohibited_identity_ids
+        ):
             exact_ok += 1
     exact_acc = 1.0 if not exact_cases else exact_ok / len(exact_cases)
     action_acc = (
