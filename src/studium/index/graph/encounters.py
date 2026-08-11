@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy.engine import Engine
 
@@ -21,6 +22,16 @@ def _norm_text(value: str | None) -> str:
     if value is None:
         return ""
     return re.sub(r"\s+", " ", value.strip().lower())
+
+
+def _norm_url(value: str | None) -> str:
+    if value is None:
+        return ""
+    raw = value.strip()
+    parts = urlsplit(raw)
+    return urlunsplit(
+        (parts.scheme.lower(), parts.netloc.lower(), parts.path, parts.query, parts.fragment)
+    )
 
 
 def normalize_source_identity(
@@ -41,7 +52,7 @@ def normalize_source_identity(
         unit_type=_norm_text(unit_type) or None,
         unit=_norm_text(unit) or None,
         section=_norm_text(section) or None,
-        link=_norm_text(link) or None,
+        link=_norm_url(link) or None,
         external_id_type=_norm_text(external_id_type) or None,
         external_id_value=_norm_text(external_id_value) or None,
     )
