@@ -11,6 +11,7 @@ from studium.index.graph import (
     compare_learning_encounter,
     derive_inverse_relationship_type,
     get_one_hop_neighborhood,
+    get_parent_child_candidates,
     get_prerequisites,
     normalize_source_identity,
 )
@@ -69,6 +70,32 @@ def test_one_hop_and_prerequisites(initialized_engine: Engine) -> None:
     assert neighborhood.incoming_derived[0].derived_inverse is True
     assert neighborhood.incoming_derived[0].relationship_type == "prerequisite_for"
     assert neighborhood.incoming_derived[0].target_id == "concept_backprop"
+    assert neighborhood.incoming_derived[0].target_title == "Backpropagation"
+
+
+def test_parent_child_buckets_follow_graph_direction(initialized_engine: Engine) -> None:
+    _upsert_concept(initialized_engine, "parent", "Parent")
+    _upsert_concept(initialized_engine, "child", "Child")
+    with begin_connection(initialized_engine) as connection:
+        relationships.insert_relationship(
+            connection,
+            {
+                "source_concept_id": "parent",
+                "relationship_type": "parent_of",
+                "target_id": "child",
+                "target_title": "Child",
+                "vault_status": "found",
+                "learning_role": "supporting",
+                "confidence": "high",
+                "status": "user_confirmed",
+            },
+        )
+    assert [
+        r.target_id for r in get_parent_child_candidates(initialized_engine, "parent")["children"]
+    ] == ["child"]
+    assert [
+        r.target_id for r in get_parent_child_candidates(initialized_engine, "child")["parents"]
+    ] == ["parent"]
 
 
 def test_encounter_outcomes(initialized_engine: Engine) -> None:
@@ -152,3 +179,14 @@ def test_encounter_outcomes(initialized_engine: Engine) -> None:
         initialized_engine, concept_id="concept_sgd", candidate=other_book
     )
     assert different.outcome == EncounterOutcome.DIFFERENT_SOURCE
+
+
+def test_source_urls_preserve_case_sensitive_components() -> None:
+    upper = normalize_source_identity(
+        source_type="web", source_title="Page", link="HTTPS://EXAMPLE.TEST/A?q=X"
+    )
+    lower = normalize_source_identity(
+        source_type="web", source_title="Page", link="https://example.test/a?q=X"
+    )
+    assert upper.link == "https://example.test/A?q=X"
+    assert build_encounter_fingerprint(upper) != build_encounter_fingerprint(lower)
