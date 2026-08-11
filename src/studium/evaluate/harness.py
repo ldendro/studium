@@ -26,16 +26,20 @@ APPROVED_THRESHOLDS: dict[str, float] = {
     "recall_at_5": 0.90,
     "structured_validity": 1.0,
     "action_accuracy": 0.85,
-    "relationship_direction_accuracy": 0.90,
 }
 
 
 def default_cases_dir() -> Path:
+    packaged = Path(__file__).resolve().parent / "cases"
+    if packaged.exists():
+        return packaged
     return Path(__file__).resolve().parents[3] / "evals" / "phase2" / "cases"
 
 
 def load_evaluation_cases(path: Path | None = None) -> list[EvaluationCase]:
     root = default_cases_dir() if path is None else path
+    if not root.exists():
+        raise FileNotFoundError(f"Evaluation cases path does not exist: {root}")
     files = [root] if root.is_file() else sorted(root.glob("*.yaml")) + sorted(root.glob("*.yml"))
     cases: list[EvaluationCase] = []
     for file in files:
@@ -50,7 +54,7 @@ def load_evaluation_cases(path: Path | None = None) -> list[EvaluationCase]:
 
 def recall_at_k(ranked_ids: list[str], required: list[str], *, k: int = 5) -> float:
     if not required:
-        return 1.0
+        return 0.0
     top = set(ranked_ids[:k])
     hits = sum(1 for concept_id in required if concept_id in top)
     return hits / len(required)
@@ -58,7 +62,7 @@ def recall_at_k(ranked_ids: list[str], required: list[str], *, k: int = 5) -> fl
 
 def mean_reciprocal_rank(ranked_ids: list[str], required: list[str]) -> float:
     if not required:
-        return 1.0
+        return 0.0
     best = 0.0
     for concept_id in required:
         try:
@@ -86,7 +90,13 @@ def run_retrieval_evaluation(
         if search.exact_matches:
             ranked_ids = [m.concept_id for m in search.exact_matches] + ranked_ids
         required = case.required_candidate_ids
-        hit = recall_at_k(ranked_ids, required, k=5) >= 1.0 if required else True
+        prohibited = set(case.prohibited_identity_ids)
+        if not required and not prohibited:
+            raise ValueError(f"Retrieval case {case.case_id!r} has no retrieval labels")
+        prohibited_found = bool(prohibited.intersection(ranked_ids))
+        hit = (
+            not required or recall_at_k(ranked_ids, required, k=5) >= 1.0
+        ) and not prohibited_found
         results.append(
             RetrievalCaseResult(
                 case_id=case.case_id,
@@ -121,7 +131,7 @@ def run_recommendation_evaluation(
                     case_id=case.case_id,
                     action=None,
                     action_ok=False,
-                    structured_ok=True,
+                    structured_ok=False,
                     failure_code=outcome.error_code,
                 )
             )
@@ -160,19 +170,25 @@ def generate_evaluation_report(
         if match and match.resolution_state == ResolutionState.EXACT_MATCH.value:
             exact_ok += 1
     exact_acc = 1.0 if not exact_cases else exact_ok / len(exact_cases)
-    action_acc = sum(1.0 if r.action_ok else 0.0 for r in recommendations) / max(
-        1, len(recommendations)
+    action_acc = (
+        sum(1.0 if r.action_ok else 0.0 for r in recommendations) / len(recommendations)
+        if recommendations
+        else 0.0
     )
-    structured = sum(1.0 if r.structured_ok else 0.0 for r in recommendations) / max(
-        1, len(recommendations)
+    structured = (
+        sum(1.0 if r.structured_ok else 0.0 for r in recommendations) / len(recommendations)
+        if recommendations
+        else 0.0
     )
     thresholds = dict(APPROVED_THRESHOLDS)
-    met = (
-        exact_acc >= thresholds["exact_lookup_accuracy"]
-        and recall >= thresholds["recall_at_5"]
-        and structured >= thresholds["structured_validity"]
+    retrieval_met = (
+        exact_acc >= thresholds["exact_lookup_accuracy"] and recall >= thresholds["recall_at_5"]
+    )
+    recommendation_met = (
+        structured >= thresholds["structured_validity"]
         and action_acc >= thresholds["action_accuracy"]
     )
+    met = retrieval_met and (not recommendations or recommendation_met)
     return EvaluationReport(
         case_count=n,
         recall_at_5=recall,
