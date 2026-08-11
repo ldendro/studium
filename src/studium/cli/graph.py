@@ -198,14 +198,13 @@ def cmd_graph_evaluate_recommendations(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
     cases = load_evaluation_cases(None if args.cases is None else Path(args.cases))
-    provider = DeterministicLLMProvider()
     retrieval = run_retrieval_evaluation(engine, cases)
-    recommendations = run_recommendation_evaluation(engine, cases, provider=provider)
+    recommendations = run_recommendation_evaluation(engine, cases, provider=None)
     report = generate_evaluation_report(
         cases=cases,
         retrieval=retrieval,
         recommendations=recommendations,
-        config={"command": "evaluate-recommendations", "provider": "deterministic"},
+        config={"command": "evaluate-recommendations", "provider": "deterministic-fallback"},
     )
     if args.json:
         return _emit(report, as_json=True)
