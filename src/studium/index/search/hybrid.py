@@ -383,6 +383,34 @@ def _tier1_hybrid(
     for index, candidate in enumerate(ranked_concepts, start=1):
         candidate.fused_rank = index
 
+    if any(
+        (
+            search_query.filters.domains,
+            search_query.filters.concept_types,
+            search_query.filters.vault_statuses,
+            search_query.filters.review_statuses,
+        )
+    ):
+        parent_filter_cache: dict[str, bool] = {}
+        for module in hybrid_modules:
+            if module.concept_id not in parent_filter_cache:
+                parent = _enrich_concept(
+                    engine,
+                    module.concept_id,
+                    fused_rank=0,
+                    fused_score=0.0,
+                    channels=[],
+                    matched_fields=[],
+                    overview_excerpt=None,
+                    matching_modules=[],
+                )
+                parent_filter_cache[module.concept_id] = bool(
+                    parent is not None and _passes_filters(parent, search_query)
+                )
+        hybrid_modules = [
+            module for module in hybrid_modules if parent_filter_cache.get(module.concept_id, False)
+        ]
+
     if not ranked_concepts and not hybrid_modules:
         state = ResolutionState.NO_RESULTS
     else:

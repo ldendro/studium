@@ -98,13 +98,7 @@ def recommend(
     revision = search.index_revision
 
     exact_match = search.exact_matches[0] if search.exact_matches else None
-    intent_target_id = (
-        exact_match.concept_id
-        if exact_match is not None
-        else search.ranked_concepts[0].concept_id
-        if search.ranked_concepts
-        else None
-    )
+    intent_target_id = exact_match.concept_id if exact_match is not None else None
 
     # Explicit source intent takes precedence over generic exact reuse.
     if (
@@ -141,6 +135,20 @@ def recommend(
                 existing_encounter_id=comparison.matched_encounter_id,
                 enrichment_fields=["unit"] if unit else [],
                 comparison_outcome=comparison.outcome.value,
+            )
+        if comparison.outcome == EncounterOutcome.AMBIGUOUS:
+            return RequestClarificationRecommendation(
+                confidence=ConfidenceLevel.LOW,
+                completion_status=CompletionStatus.COMPLETE,
+                reasoning_mode=ReasoningMode.DETERMINISTIC,
+                index_revision=revision,
+                evidence=["ambiguous_learning_encounter"],
+                ambiguity_type="learning_encounter_collision",
+                candidate_interpretations=[intent_target_id],
+                clarification_message=(
+                    "Multiple existing learning encounters conflict with the supplied "
+                    "source metadata."
+                ),
             )
         return AddLearningEncounterRecommendation(
             confidence=ConfidenceLevel.MEDIUM,
@@ -204,74 +212,6 @@ def recommend(
             candidate_interpretations=[m.concept_id for m in search.exact_matches],
             clarification_message="Multiple concepts match this title or alias.",
         )
-
-    # Source encounter path when source metadata provided and a top candidate exists
-    if source_type and source_title and search.ranked_concepts:
-        target = search.ranked_concepts[0]
-        if _concept_exists(engine, target.concept_id):
-            candidate = normalize_source_identity(
-                source_type=source_type,
-                source_title=source_title,
-                unit=unit,
-            )
-            comparison = compare_learning_encounter(
-                engine, concept_id=target.concept_id, candidate=candidate
-            )
-            if comparison.outcome == EncounterOutcome.EXACT_SAME_ENCOUNTER:
-                return MarkRedundantRecommendation(
-                    confidence=ConfidenceLevel.HIGH,
-                    completion_status=CompletionStatus.COMPLETE,
-                    reasoning_mode=ReasoningMode.DETERMINISTIC,
-                    index_revision=revision,
-                    evidence=["exact_same_encounter"],
-                    target_concept_id=target.concept_id,
-                    reason="Learning encounter already indexed",
-                )
-            if comparison.outcome == EncounterOutcome.SAME_SOURCE_ENRICH_EXISTING:
-                assert comparison.matched_encounter_id is not None
-                return UpdateLearningEncounterRecommendation(
-                    confidence=ConfidenceLevel.HIGH,
-                    completion_status=CompletionStatus.COMPLETE,
-                    reasoning_mode=ReasoningMode.DETERMINISTIC,
-                    index_revision=revision,
-                    evidence=["same_source_enrich_existing"],
-                    target_concept_id=target.concept_id,
-                    existing_encounter_id=comparison.matched_encounter_id,
-                    enrichment_fields=["unit"] if unit else [],
-                    comparison_outcome=comparison.outcome.value,
-                )
-            if comparison.outcome in {
-                EncounterOutcome.SAME_SOURCE_NEW_UNIT,
-                EncounterOutcome.DIFFERENT_SOURCE,
-            }:
-                return AddLearningEncounterRecommendation(
-                    confidence=ConfidenceLevel.MEDIUM,
-                    completion_status=CompletionStatus.COMPLETE,
-                    reasoning_mode=ReasoningMode.DETERMINISTIC,
-                    index_revision=revision,
-                    evidence=[comparison.outcome.value],
-                    target_concept_id=target.concept_id,
-                    source_type=source_type,
-                    source_title=source_title,
-                    unit=unit,
-                    comparison_outcome=comparison.outcome.value,
-                )
-
-    # Module intent shortcut when requested and strong top hit
-    if module_intent and search.ranked_concepts:
-        target = search.ranked_concepts[0]
-        if _concept_exists(engine, target.concept_id):
-            return AddScaffoldModuleRecommendation(
-                confidence=ConfidenceLevel.MEDIUM,
-                completion_status=CompletionStatus.COMPLETE,
-                reasoning_mode=ReasoningMode.DETERMINISTIC,
-                index_revision=revision,
-                evidence=["module_intent_top_candidate"],
-                target_concept_id=target.concept_id,
-                module_type="derivation",
-                module_title=query_text[:80] or "New module",
-                focus=None,
-            )
 
     # LLM path when provider supplied
     if provider is not None:

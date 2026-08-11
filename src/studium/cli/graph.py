@@ -30,7 +30,8 @@ from studium.index.graph import (
     get_prerequisites,
 )
 from studium.index.search.hybrid import HybridSearchOptions
-from studium.llm import DEFAULT_LLM_BASE_URL, DEFAULT_REASONING_MODEL, DeterministicLLMProvider
+from studium.index.search.models import ConceptSearchQuery
+from studium.llm import DEFAULT_LLM_BASE_URL, DEFAULT_REASONING_MODEL
 from studium.recommend import recommend
 from studium.vault import Vault
 
@@ -114,7 +115,10 @@ def cmd_graph_status(args: argparse.Namespace) -> int:
 def cmd_graph_find(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
-    result = search_concepts(engine, args.query)
+    result = search_concepts(
+        engine,
+        ConceptSearchQuery(text=args.query, include_diagnostics=args.diagnostics),
+    )
     diagnostics = result.diagnostics if args.diagnostics else None
     return _emit(result, as_json=args.json, diagnostics=diagnostics)
 
@@ -164,7 +168,7 @@ def cmd_graph_propose(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
     search = search_concepts(engine, args.query)
-    provider = DeterministicLLMProvider() if args.deterministic else None
+    provider = None
     outcome = recommend(
         engine,
         search=search,

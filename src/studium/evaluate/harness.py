@@ -94,9 +94,15 @@ def run_retrieval_evaluation(
         if not required and not prohibited:
             raise ValueError(f"Retrieval case {case.case_id!r} has no retrieval labels")
         prohibited_found = bool(prohibited.intersection(ranked_ids))
+        resolution_ok = (
+            not case.expected_resolution_states
+            or search.resolution_state.value in case.expected_resolution_states
+        )
         hit = (
-            not required or recall_at_k(ranked_ids, required, k=5) >= 1.0
-        ) and not prohibited_found
+            (not required or recall_at_k(ranked_ids, required, k=5) >= 1.0)
+            and not prohibited_found
+            and resolution_ok
+        )
         results.append(
             RetrievalCaseResult(
                 case_id=case.case_id,

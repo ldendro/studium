@@ -54,7 +54,7 @@ def normalize_source_identity(
         section=_norm_text(section) or None,
         link=_norm_url(link) or None,
         external_id_type=_norm_text(external_id_type) or None,
-        external_id_value=_norm_text(external_id_value) or None,
+        external_id_value=external_id_value.strip() if external_id_value else None,
     )
 
 
@@ -70,12 +70,6 @@ def build_source_fingerprint(identity: SourceIdentity) -> str:
             "kind": "external_id",
             "type": identity.external_id_type,
             "value": identity.external_id_value,
-        }
-    elif identity.link:
-        payload = {
-            "kind": "link",
-            "source_type": identity.source_type,
-            "link": identity.link,
         }
     else:
         payload = {
@@ -217,9 +211,17 @@ def compare_learning_encounter(
 
 
 def _is_enrichment(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
+    compatible = all(
+        not old or not new or old == new
+        for old, new in (
+            (existing.unit_type, candidate.unit_type),
+            (existing.unit, candidate.unit),
+            (existing.section, candidate.section),
+        )
+    )
     unit_enrich = not existing.unit and bool(candidate.unit)
     section_enrich = not existing.section and bool(candidate.section)
-    return unit_enrich or section_enrich
+    return compatible and (unit_enrich or section_enrich)
 
 
 def _unit_differs(existing: SourceIdentity, candidate: SourceIdentity) -> bool:

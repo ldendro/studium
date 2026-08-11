@@ -50,7 +50,8 @@ def get_relationships_grouped_by_type(
     concept_id: str,
 ) -> dict[str, list[GraphRelationship]]:
     grouped: dict[str, list[GraphRelationship]] = {}
-    for rel in get_one_hop_neighborhood(engine, concept_id).outgoing:
+    neighborhood = get_one_hop_neighborhood(engine, concept_id)
+    for rel in [*neighborhood.outgoing, *neighborhood.incoming_derived]:
         grouped.setdefault(rel.relationship_type, []).append(rel)
     return grouped
 
@@ -60,7 +61,8 @@ def get_relationships_grouped_by_learning_role(
     concept_id: str,
 ) -> dict[str, list[GraphRelationship]]:
     grouped: dict[str, list[GraphRelationship]] = {}
-    for rel in get_one_hop_neighborhood(engine, concept_id).outgoing:
+    neighborhood = get_one_hop_neighborhood(engine, concept_id)
+    for rel in [*neighborhood.outgoing, *neighborhood.incoming_derived]:
         grouped.setdefault(rel.learning_role, []).append(rel)
     return grouped
 

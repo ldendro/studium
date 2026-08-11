@@ -189,4 +189,22 @@ def test_source_urls_preserve_case_sensitive_components() -> None:
         source_type="web", source_title="Page", link="https://example.test/a?q=X"
     )
     assert upper.link == "https://example.test/A?q=X"
+    # Normalized type/title is the primary source identity; links remain secondary metadata.
+    assert build_encounter_fingerprint(upper) == build_encounter_fingerprint(lower)
+
+
+def test_external_identifier_values_preserve_case() -> None:
+    upper = normalize_source_identity(
+        source_type="video",
+        source_title="Lesson",
+        external_id_type="youtube",
+        external_id_value="AbC",
+    )
+    lower = normalize_source_identity(
+        source_type="video",
+        source_title="Lesson",
+        external_id_type="youtube",
+        external_id_value="abc",
+    )
+    assert upper.external_id_value == "AbC"
     assert build_encounter_fingerprint(upper) != build_encounter_fingerprint(lower)
