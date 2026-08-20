@@ -193,6 +193,22 @@ def recommend(
             comparison_outcome=comparison.outcome.value,
         )
 
+    if source_type and source_title and intent_target_id is None:
+        return RequestClarificationRecommendation(
+            confidence=ConfidenceLevel.LOW,
+            completion_status=CompletionStatus.COMPLETE,
+            reasoning_mode=ReasoningMode.DETERMINISTIC,
+            index_revision=revision,
+            evidence=["source_intent_without_unique_target"],
+            ambiguity_type="learning_encounter_target",
+            candidate_interpretations=[
+                candidate.concept_id for candidate in search.ranked_concepts[:5]
+            ],
+            clarification_message=(
+                "Choose the concept that should receive the supplied learning encounter."
+            ),
+        )
+
     # Explicit module intent also takes precedence over generic exact reuse.
     if module_intent and intent_target_id and _concept_exists(engine, intent_target_id):
         return AddScaffoldModuleRecommendation(

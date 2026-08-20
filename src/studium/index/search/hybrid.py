@@ -157,13 +157,16 @@ def _tier1_hybrid(
     diagnostics["path"] = "tier1"
     limits = search_query.limits
     channel_limit = limits.channel
+    channel_query_limit = (
+        2_147_483_647 if channel_limit > 0 and _has_filters(search_query) else channel_limit
+    )
     weights = dict(options.rrf_weights or DEFAULT_RRF_WEIGHTS)
     status = SearchStatus.COMPLETE
     channel_errors: list[str] = []
 
-    fts_concepts = search_concepts_fts(engine, search_query.text, limit=channel_limit)
+    fts_concepts = search_concepts_fts(engine, search_query.text, limit=channel_query_limit)
     fts_modules = (
-        search_modules_fts(engine, search_query.text, limit=channel_limit)
+        search_modules_fts(engine, search_query.text, limit=channel_query_limit)
         if search_query.include_modules
         else []
     )
@@ -199,7 +202,7 @@ def _tier1_hybrid(
                 engine,
                 identity_vec,
                 model_filter,
-                limit=channel_limit,
+                limit=channel_query_limit,
                 backend=options.vector_backend,
             )
             fut_sem = pool.submit(
@@ -207,7 +210,7 @@ def _tier1_hybrid(
                 engine,
                 semantic_vec,
                 model_filter,
-                limit=channel_limit,
+                limit=channel_query_limit,
                 backend=options.vector_backend,
             )
             fut_mod = None
@@ -217,7 +220,7 @@ def _tier1_hybrid(
                     engine,
                     semantic_vec,
                     model_filter,
-                    limit=channel_limit,
+                    limit=channel_query_limit,
                     backend=options.vector_backend,
                 )
             try:

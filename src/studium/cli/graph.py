@@ -35,7 +35,11 @@ from studium.index.graph import (
 from studium.index.repositories import embeddings as embeddings_repo
 from studium.index.search.hybrid import HybridSearchOptions
 from studium.index.search.models import ConceptSearchQuery
-from studium.llm import DEFAULT_LLM_BASE_URL, DEFAULT_REASONING_MODEL
+from studium.llm import (
+    DEFAULT_LLM_BASE_URL,
+    DEFAULT_REASONING_MODEL,
+    DeterministicLLMProvider,
+)
 from studium.recommend import recommend
 from studium.vault import Vault
 
@@ -119,6 +123,8 @@ def _payload_exit_code(payload: Any) -> int:
             sync_data = cast(dict[str, Any], sync_data)
             if sync_data.get("status") == "failed":
                 return 1
+        if data.get("thresholds_met") is False:
+            return 1
         if "failure_stage" in data and "error_code" in data:
             return 1
     return 0
@@ -130,9 +136,12 @@ def cmd_graph_sync(args: argparse.Namespace) -> int:
     vault = Vault(config.resolved_vault_root)
     try:
         provider = SentenceTransformersEmbeddingProvider()
-    except ImportError:
+    except Exception as exc:
         report = sync_vault(vault, engine, config)
-        payload: Any = report
+        payload: Any = {
+            "sync": report.model_dump(mode="json"),
+            "embeddings": {"status": "unavailable", "error": str(exc)},
+        }
     else:
         combined = sync_and_embed(vault, engine, config, provider)
         payload = {
@@ -260,7 +269,7 @@ def cmd_graph_evaluate_retrieval(args: argparse.Namespace) -> int:
     if args.json:
         return _emit(report, as_json=True)
     print(report_to_markdown(report))
-    return 0
+    return _payload_exit_code(report)
 
 
 def cmd_graph_evaluate_recommendations(args: argparse.Namespace) -> int:
@@ -269,14 +278,48 @@ def cmd_graph_evaluate_recommendations(args: argparse.Namespace) -> int:
     cases = load_evaluation_cases(None if args.cases is None else Path(args.cases))
     options = _search_options(engine)
     retrieval = run_retrieval_evaluation(engine, cases, options=options)
-    recommendations = run_recommendation_evaluation(engine, cases, provider=None, options=options)
+    provider = DeterministicLLMProvider(handler=_evaluation_reasoning_response)
+    recommendations = run_recommendation_evaluation(
+        engine, cases, provider=provider, options=options
+    )
     report = generate_evaluation_report(
         cases=cases,
         retrieval=retrieval,
         recommendations=recommendations,
-        config={"command": "evaluate-recommendations", "provider": "deterministic-fallback"},
+        config={"command": "evaluate-recommendations", "provider": provider.model_id()},
     )
     if args.json:
         return _emit(report, as_json=True)
     print(report_to_markdown(report))
-    return 0
+    return _payload_exit_code(report)
+
+
+def _evaluation_reasoning_response(system_prompt: str, user_prompt: str) -> dict[str, Any]:
+    _ = user_prompt
+    if "whether a query refers to an existing concept" in system_prompt:
+        return {
+            "classification": "insufficient_information",
+            "selected_concept_id": None,
+            "confidence": "low",
+            "rationale": "No verified identity candidate.",
+            "evidence": ["deterministic_evaluation"],
+        }
+    if "clarification" in system_prompt.lower():
+        return {
+            "needs_clarification": False,
+            "ambiguity_type": "none",
+            "candidate_interpretations": [],
+            "clarification_message": "No clarification required.",
+            "confidence": "medium",
+            "evidence": ["deterministic_evaluation"],
+        }
+    return {
+        "suggested_concept_type": "general_concept",
+        "suggested_domains": [],
+        "scope_summary": "Deterministic evaluation suggestion.",
+        "graph_positions": [],
+        "prerequisite_titles": [],
+        "confidence": "medium",
+        "rationale": "No existing concept was verified.",
+        "evidence": ["deterministic_evaluation"],
+    }
