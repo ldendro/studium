@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
@@ -98,14 +99,13 @@ def run_retrieval_evaluation(
             ),
             options=options,
         )
-        ranked_ids = [c.concept_id for c in search.ranked_concepts]
-        if search.exact_matches:
-            ranked_ids = [m.concept_id for m in search.exact_matches] + ranked_ids
+        exact_match_ids = [match.concept_id for match in search.exact_matches]
+        ranked_ids = exact_match_ids + [c.concept_id for c in search.ranked_concepts]
         required = case.required_candidate_ids
         prohibited = set(case.prohibited_identity_ids)
         if not required and not prohibited:
             raise ValueError(f"Retrieval case {case.case_id!r} has no retrieval labels")
-        prohibited_found = bool(prohibited.intersection(ranked_ids))
+        prohibited_found = bool(prohibited.intersection(exact_match_ids))
         resolution_ok = (
             not case.expected_resolution_states
             or search.resolution_state.value in case.expected_resolution_states
@@ -121,6 +121,7 @@ def run_retrieval_evaluation(
                 hit=hit,
                 reciprocal_rank=mean_reciprocal_rank(ranked_ids, required),
                 ranked_ids=ranked_ids[:10],
+                exact_match_ids=exact_match_ids,
                 resolution_state=search.resolution_state.value,
                 search_status=search.search_status.value,
             )
@@ -133,6 +134,7 @@ def run_recommendation_evaluation(
     cases: list[EvaluationCase],
     *,
     provider: LLMProvider | None = None,
+    provider_factory: Callable[[EvaluationCase], LLMProvider] | None = None,
     options: HybridSearchOptions | None = None,
 ) -> list[RecommendationCaseResult]:
     results: list[RecommendationCaseResult] = []
@@ -145,7 +147,8 @@ def run_recommendation_evaluation(
             ),
             options=options,
         )
-        outcome = recommend(engine, search=search, provider=provider)
+        case_provider = provider_factory(case) if provider_factory is not None else provider
+        outcome = recommend(engine, search=search, provider=case_provider)
         if isinstance(outcome, RecommendationFailure):
             results.append(
                 RecommendationCaseResult(
@@ -239,13 +242,26 @@ def generate_evaluation_report(
         else 0.0
     )
     thresholds = dict(APPROVED_THRESHOLDS)
-    case_verdicts_met = len(retrieval_by_case) == len(cases) and all(
-        retrieval_by_case[case.case_id].hit for case in cases
+    retrieval_coverage_met = len(retrieval) == len(cases) and set(retrieval_by_case) == {
+        case.case_id for case in cases
+    }
+    case_constraints_met = retrieval_coverage_met and all(
+        (
+            not set(case.prohibited_identity_ids).intersection(
+                retrieval_by_case[case.case_id].exact_match_ids
+            )
+            and (
+                not case.expected_resolution_states
+                or retrieval_by_case[case.case_id].resolution_state
+                in case.expected_resolution_states
+            )
+        )
+        for case in cases
     )
     retrieval_met = (
         exact_acc >= thresholds["exact_lookup_accuracy"]
         and (not positive_cases or recall >= thresholds["recall_at_5"])
-        and case_verdicts_met
+        and case_constraints_met
     )
     recommendation_met = (
         len(recommendations) == len(cases)

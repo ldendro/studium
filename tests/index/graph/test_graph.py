@@ -15,6 +15,7 @@ from studium.index.graph import (
     get_prerequisites,
     normalize_source_identity,
 )
+from studium.index.graph.encounters import compare_against_rows
 from studium.index.repositories import concepts, learning_encounters, relationships
 
 
@@ -190,6 +191,31 @@ def test_source_urls_preserve_case_sensitive_components() -> None:
     )
     assert upper.link == "https://example.test/A?q=X"
     assert build_encounter_fingerprint(upper) != build_encounter_fingerprint(lower)
+
+
+def test_same_title_with_conflicting_links_is_a_different_source() -> None:
+    existing = normalize_source_identity(
+        source_type="web", source_title="Page", link="https://example.test/first"
+    )
+    candidate = normalize_source_identity(
+        source_type="web", source_title="Page", link="https://example.test/second"
+    )
+    row = {
+        "encounter_id": 1,
+        "concept_id": "concept_web",
+        "source_type": existing.source_type,
+        "source_title": existing.source_title,
+        "link": existing.link,
+        "unit": None,
+        "unit_type": None,
+        "section": None,
+        "external_id_type": None,
+        "external_id_value": None,
+    }
+
+    comparison = compare_against_rows([row], candidate=candidate)
+
+    assert comparison.outcome == EncounterOutcome.DIFFERENT_SOURCE
 
 
 def test_external_identifier_values_preserve_case() -> None:

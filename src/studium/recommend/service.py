@@ -122,6 +122,24 @@ def recommend(
             ),
         )
 
+    normalized_source_type: SourceType | None = None
+    if source_type is not None:
+        try:
+            normalized_source_type = SourceType(source_type.strip().lower())
+        except ValueError:
+            return RequestClarificationRecommendation(
+                confidence=ConfidenceLevel.LOW,
+                completion_status=CompletionStatus.COMPLETE,
+                reasoning_mode=ReasoningMode.DETERMINISTIC,
+                index_revision=revision,
+                evidence=["invalid_source_type"],
+                ambiguity_type="invalid_source_type",
+                candidate_interpretations=[item.value for item in SourceType],
+                clarification_message=(
+                    f"Unsupported source type {source_type!r}; choose a supported value."
+                ),
+            )
+
     exact_match = (
         search.exact_matches[0]
         if search.resolution_state == ResolutionState.EXACT_MATCH and len(search.exact_matches) == 1
@@ -180,6 +198,7 @@ def recommend(
                     "source metadata."
                 ),
             )
+        assert normalized_source_type is not None
         return AddLearningEncounterRecommendation(
             confidence=ConfidenceLevel.MEDIUM,
             completion_status=CompletionStatus.COMPLETE,
@@ -187,7 +206,7 @@ def recommend(
             index_revision=revision,
             evidence=[comparison.outcome.value],
             target_concept_id=intent_target_id,
-            source_type=SourceType(source_type),
+            source_type=normalized_source_type,
             source_title=source_title,
             unit=unit,
             comparison_outcome=comparison.outcome.value,

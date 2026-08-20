@@ -249,6 +249,8 @@ def _same_source_by_fallback(existing: SourceIdentity, candidate: SourceIdentity
     )
     if not same_title:
         return False
+    if existing.link and candidate.link and existing.link != candidate.link:
+        return False
     existing_external = (existing.external_id_type, existing.external_id_value)
     candidate_external = (candidate.external_id_type, candidate.external_id_value)
     if all(existing_external) and all(candidate_external):

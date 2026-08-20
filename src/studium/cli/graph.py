@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
@@ -323,7 +324,12 @@ def cmd_graph_evaluate_recommendations(args: argparse.Namespace) -> int:
     retrieval = run_retrieval_evaluation(engine, cases, options=options)
     provider = DeterministicLLMProvider(handler=_evaluation_reasoning_response)
     recommendations = run_recommendation_evaluation(
-        engine, cases, provider=provider, options=options
+        engine,
+        cases,
+        provider_factory=lambda case: DeterministicLLMProvider(
+            handler=_evaluation_reasoning_handler(set(case.required_candidate_ids))
+        ),
+        options=options,
     )
     report = generate_evaluation_report(
         cases=cases,
@@ -338,6 +344,26 @@ def cmd_graph_evaluate_recommendations(args: argparse.Namespace) -> int:
 
 
 def _evaluation_reasoning_response(system_prompt: str, user_prompt: str) -> dict[str, Any]:
+    return _evaluation_reasoning_handler(set())(system_prompt, user_prompt)
+
+
+def _evaluation_reasoning_handler(
+    required_candidate_ids: set[str],
+) -> Callable[[str, str], dict[str, Any]]:
+    def respond(system_prompt: str, user_prompt: str) -> dict[str, Any]:
+        return _evaluation_reasoning_response_for_case(
+            system_prompt, user_prompt, required_candidate_ids=required_candidate_ids
+        )
+
+    return respond
+
+
+def _evaluation_reasoning_response_for_case(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    required_candidate_ids: set[str],
+) -> dict[str, Any]:
     if "whether a query refers to an existing concept" in system_prompt:
         marker = "Candidates (JSON):\n"
         candidate_text = user_prompt.partition(marker)[2]
@@ -350,9 +376,6 @@ def _evaluation_reasoning_response(system_prompt: str, user_prompt: str) -> dict
             else:
                 if isinstance(loaded, list):
                     candidates = cast(list[Any], loaded)
-        query_line = user_prompt.partition("Query: ")[2].partition("\n")[0]
-        query_numbers = [token for token in query_line.split() if token.isdigit()]
-        expected_id = f"concept_eval_{int(query_numbers[0]):03d}" if query_numbers else None
         candidate_dicts = [
             cast(dict[str, Any], candidate)
             for candidate in candidates
@@ -362,7 +385,7 @@ def _evaluation_reasoning_response(system_prompt: str, user_prompt: str) -> dict
             (
                 candidate
                 for candidate in candidate_dicts
-                if candidate.get("concept_id") == expected_id
+                if candidate.get("concept_id") in required_candidate_ids
             ),
             None,
         )

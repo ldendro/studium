@@ -10,7 +10,11 @@ from studium.evaluate import (
     report_to_markdown,
 )
 from studium.evaluate.harness import generate_evaluation_report
-from studium.evaluate.models import RecommendationCaseResult, RetrievalCaseResult
+from studium.evaluate.models import (
+    EvaluationCase,
+    RecommendationCaseResult,
+    RetrievalCaseResult,
+)
 
 
 def test_load_cases() -> None:
@@ -103,3 +107,55 @@ def test_incomplete_recommendation_coverage_fails_evaluation() -> None:
     assert report.action_accuracy == 1.0
     assert report.structured_validity == 1.0
     assert report.thresholds_met is False
+
+
+def test_recall_threshold_allows_one_missed_positive_case() -> None:
+    cases = [
+        EvaluationCase(
+            case_id=f"case-{index}",
+            query=f"query {index}",
+            required_candidate_ids=[f"concept-{index}"],
+            expected_resolution_states=["related_results"],
+        )
+        for index in range(10)
+    ]
+    retrieval = [
+        RetrievalCaseResult(
+            case_id=case.case_id,
+            hit=index < 9,
+            reciprocal_rank=1.0 if index < 9 else 0.0,
+            ranked_ids=list(case.required_candidate_ids) if index < 9 else [],
+            resolution_state="related_results",
+            search_status="complete",
+        )
+        for index, case in enumerate(cases)
+    ]
+
+    report = generate_evaluation_report(cases=cases, retrieval=retrieval, recommendations=[])
+
+    assert report.recall_at_5 == 0.9
+    assert report.thresholds_met is True
+
+
+def test_related_prohibited_identity_does_not_fail_retrieval_gate() -> None:
+    case = EvaluationCase(
+        case_id="distinct-related",
+        query="related but distinct",
+        prohibited_identity_ids=["related-concept"],
+        expected_resolution_states=["related_results"],
+    )
+    retrieval = [
+        RetrievalCaseResult(
+            case_id=case.case_id,
+            hit=True,
+            reciprocal_rank=0.0,
+            ranked_ids=["related-concept"],
+            exact_match_ids=[],
+            resolution_state="related_results",
+            search_status="complete",
+        )
+    ]
+
+    report = generate_evaluation_report(cases=[case], retrieval=retrieval, recommendations=[])
+
+    assert report.thresholds_met is True

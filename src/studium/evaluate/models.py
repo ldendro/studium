@@ -35,6 +35,7 @@ class RetrievalCaseResult(BaseModel):
     hit: bool
     reciprocal_rank: float
     ranked_ids: list[str] = Field(default_factory=_empty_strings)
+    exact_match_ids: list[str] = Field(default_factory=_empty_strings)
     resolution_state: str
     search_status: str
 

@@ -17,6 +17,7 @@ from studium.index.search.models import (
 )
 from studium.recommend import recommend
 from studium.recommend.models import (
+    AddLearningEncounterRecommendation,
     CreateNewConceptRecommendation,
     RequestClarificationRecommendation,
     UseExistingConceptRecommendation,
@@ -63,6 +64,62 @@ def test_use_existing_from_exact_match(initialized_engine: Engine) -> None:
     assert isinstance(result, UseExistingConceptRecommendation)
     assert result.target_concept_id == "concept_sgd"
     assert result.reasoning_mode.value == "deterministic"
+
+
+def test_source_type_is_normalized_for_encounter_recommendation(
+    initialized_engine: Engine,
+) -> None:
+    _upsert(initialized_engine, "concept_sgd", "SGD")
+    search = ConceptSearchResult(
+        query=ConceptSearchQuery(text="SGD"),
+        index_revision=1,
+        search_status=SearchStatus.COMPLETE,
+        resolution_state=ResolutionState.EXACT_MATCH,
+        exact_matches=[
+            IdentityMatch(
+                concept_id="concept_sgd",
+                canonical_title="SGD",
+                match_type=ExactMatchType.CANONICAL_TITLE,
+            )
+        ],
+    )
+
+    result = recommend(
+        initialized_engine,
+        search=search,
+        source_type="Book",
+        source_title="Hands-On Machine Learning",
+    )
+
+    assert isinstance(result, AddLearningEncounterRecommendation)
+    assert result.source_type.value == "book"
+
+
+def test_invalid_source_type_requests_clarification(initialized_engine: Engine) -> None:
+    _upsert(initialized_engine, "concept_sgd", "SGD")
+    search = ConceptSearchResult(
+        query=ConceptSearchQuery(text="SGD"),
+        index_revision=1,
+        search_status=SearchStatus.COMPLETE,
+        resolution_state=ResolutionState.EXACT_MATCH,
+        exact_matches=[
+            IdentityMatch(
+                concept_id="concept_sgd",
+                canonical_title="SGD",
+                match_type=ExactMatchType.CANONICAL_TITLE,
+            )
+        ],
+    )
+
+    result = recommend(
+        initialized_engine,
+        search=search,
+        source_type="unsupported",
+        source_title="Source",
+    )
+
+    assert isinstance(result, RequestClarificationRecommendation)
+    assert result.ambiguity_type == "invalid_source_type"
 
 
 def test_ambiguous_requests_clarification(initialized_engine: Engine) -> None:

@@ -270,9 +270,9 @@ def test_graph_recommendation_evaluation_classifies_retrieved_fixture_candidate(
     write_concept_note(
         vault,
         "concepts/six.md",
-        id="concept_eval_006",
-        canonical_title="Math Sample Topic 6",
-        overview="A sample learning query about math, fixture number 6.",
+        id="custom_gradient_descent",
+        canonical_title="Gradient Descent Optimization",
+        overview="Gradient descent optimization method",
     )
     note_path = vault / "concepts/six.md"
     note_path.write_text(
@@ -283,12 +283,12 @@ def test_graph_recommendation_evaluation_classifies_retrieved_fixture_candidate(
     )
     cases.write_text(
         """case_id: p2-006
-query: Sample query 6 about math
+query: Gradient descent optimization method
 domain: math
 acceptable_actions:
   - use_existing_concept
 required_candidate_ids:
-  - concept_eval_006
+  - custom_gradient_descent
 prohibited_identity_ids: []
 expected_resolution_states:
   - related_results
