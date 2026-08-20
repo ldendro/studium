@@ -9,7 +9,12 @@ from sqlalchemy.engine import Engine
 from studium.index.graph.encounters import compare_learning_encounter, normalize_source_identity
 from studium.index.graph.models import EncounterOutcome
 from studium.index.repositories import aliases, concepts
-from studium.index.search.models import ConceptSearchResult, ResolutionState
+from studium.index.search.models import (
+    ConceptSearchResult,
+    ExactMatchType,
+    IdentityMatch,
+    ResolutionState,
+)
 from studium.llm.protocol import LLMProvider
 from studium.llm.reasoning.orchestrate import (
     parse_clarification,
@@ -237,6 +242,32 @@ def recommend(
             | {candidate.concept_id for candidate in search.ranked_concepts}
             and _concept_exists(engine, decision.selected_concept_id)
         ):
+            if (source_type and source_title) or module_intent:
+                verified = search.model_copy(
+                    update={
+                        "resolution_state": ResolutionState.EXACT_MATCH,
+                        "exact_matches": [
+                            IdentityMatch(
+                                concept_id=decision.selected_concept_id,
+                                canonical_title=next(
+                                    candidate.canonical_title
+                                    for candidate in search.ranked_concepts
+                                    if candidate.concept_id == decision.selected_concept_id
+                                ),
+                                match_type=ExactMatchType.CANONICAL_TITLE,
+                            )
+                        ],
+                    }
+                )
+                return recommend(
+                    engine,
+                    search=verified,
+                    provider=None,
+                    source_type=source_type,
+                    source_title=source_title,
+                    unit=unit,
+                    module_intent=module_intent,
+                )
             return UseExistingConceptRecommendation(
                 confidence=ConfidenceLevel(decision.confidence.value),
                 completion_status=CompletionStatus.COMPLETE,

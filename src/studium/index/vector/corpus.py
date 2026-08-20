@@ -37,6 +37,11 @@ def validate_query_vector(query_vector: list[float], model_filter: ModelSpaceFil
             f"ModelSpaceFilter.dimension {model_filter.dimension}"
         )
         raise ValueError(msg)
+    vector = np.asarray(query_vector, dtype=np.float32)
+    if not np.all(np.isfinite(vector)):
+        raise ValueError("query_vector must contain only finite values")
+    if float(np.linalg.norm(vector)) == 0.0:
+        raise ValueError("query_vector must have non-zero norm")
 
 
 def load_corpus(

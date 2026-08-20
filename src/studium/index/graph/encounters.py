@@ -160,15 +160,22 @@ def compare_against_rows(
             encounter_fingerprint=encounter_fp,
             evidence={"reason": "no_same_source"},
         )
-    if len(same_source) > 1 and _conflicting_units(same_source, candidate):
+    compatible = [
+        row for row in same_source if _fields_compatible(identity_from_row(row), candidate)
+    ]
+    candidates = compatible or (same_source if len(same_source) == 1 else [])
+    if len(candidates) != 1:
         return EncounterComparison(
             outcome=EncounterOutcome.AMBIGUOUS,
             source_fingerprint=source_fp,
             encounter_fingerprint=encounter_fp,
-            evidence={"same_source_count": len(same_source)},
+            evidence={
+                "same_source_count": len(same_source),
+                "compatible_count": len(compatible),
+            },
         )
 
-    row = same_source[0]
+    row = candidates[0]
     existing_identity = identity_from_row(row)
     if _is_enrichment(existing_identity, candidate):
         return EncounterComparison(
@@ -211,7 +218,14 @@ def compare_learning_encounter(
 
 
 def _is_enrichment(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
-    compatible = all(
+    compatible = _fields_compatible(existing, candidate)
+    unit_enrich = not existing.unit and bool(candidate.unit)
+    section_enrich = not existing.section and bool(candidate.section)
+    return compatible and (unit_enrich or section_enrich)
+
+
+def _fields_compatible(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
+    return all(
         not old or not new or old == new
         for old, new in (
             (existing.unit_type, candidate.unit_type),
@@ -219,9 +233,6 @@ def _is_enrichment(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
             (existing.section, candidate.section),
         )
     )
-    unit_enrich = not existing.unit and bool(candidate.unit)
-    section_enrich = not existing.section and bool(candidate.section)
-    return compatible and (unit_enrich or section_enrich)
 
 
 def _same_source_by_fallback(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
@@ -244,9 +255,3 @@ def _unit_differs(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
     return bool(
         existing.unit_type and candidate.unit_type and existing.unit_type != candidate.unit_type
     )
-
-
-def _conflicting_units(rows: list[dict[str, Any]], candidate: SourceIdentity) -> bool:
-    units = {identity_from_row(row).unit for row in rows}
-    units.add(candidate.unit)
-    return len({u for u in units if u}) > 1

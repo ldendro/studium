@@ -6,6 +6,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from studium.schemas.enums import LearningRole, RelationshipType
+
 
 class ConfidenceLevel(StrEnum):
     LOW = "low"
@@ -32,10 +34,10 @@ class ConceptIdentityDecision(BaseModel):
 class GraphPositionHint(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    relationship_type: str
+    relationship_type: RelationshipType
     target_concept_id: str | None = None
     target_title: str
-    learning_role: str
+    learning_role: LearningRole
     direction_note: str = ""
 
 

@@ -170,7 +170,22 @@ def generate_evaluation_report(
     config: dict[str, Any] | None = None,
 ) -> EvaluationReport:
     n = max(1, len(cases))
-    recall = sum(1.0 if r.hit else 0.0 for r in retrieval) / max(1, len(retrieval))
+    positive_cases = [case for case in cases if case.required_candidate_ids]
+    retrieval_by_case = {result.case_id: result for result in retrieval}
+    recall = (
+        sum(
+            recall_at_k(
+                retrieval_by_case[case.case_id].ranked_ids,
+                case.required_candidate_ids,
+                k=5,
+            )
+            for case in positive_cases
+            if case.case_id in retrieval_by_case
+        )
+        / len(positive_cases)
+        if positive_cases
+        else 0.0
+    )
     mrr = sum(r.reciprocal_rank for r in retrieval) / max(1, len(retrieval))
     exact_cases = [
         case
@@ -200,8 +215,8 @@ def generate_evaluation_report(
         else 0.0
     )
     thresholds = dict(APPROVED_THRESHOLDS)
-    retrieval_met = (
-        exact_acc >= thresholds["exact_lookup_accuracy"] and recall >= thresholds["recall_at_5"]
+    retrieval_met = exact_acc >= thresholds["exact_lookup_accuracy"] and (
+        not positive_cases or recall >= thresholds["recall_at_5"]
     )
     recommendation_met = (
         structured >= thresholds["structured_validity"]

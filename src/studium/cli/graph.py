@@ -48,6 +48,7 @@ def _config_from_args(args: argparse.Namespace) -> IndexConfig:
 
 
 def _engine(config: IndexConfig):
+    Vault(config.resolved_vault_root)
     engine = create_engine_for_config(config)
     try:
         ensure_compatible_index(engine)

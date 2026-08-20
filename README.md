@@ -103,7 +103,7 @@ Library entrypoints:
 uv run studium graph sync --vault /path/to/vault --json
 uv run studium graph status --vault /path/to/vault
 uv run studium graph find "stochastic gradient" --vault /path/to/vault --json
-uv run studium graph propose "SGD" --vault /path/to/vault --deterministic --json
+uv run studium graph propose "SGD" --vault /path/to/vault --json
 uv run studium graph evaluate-retrieval --vault /path/to/vault
 ```
 

@@ -126,11 +126,6 @@ def build_parser() -> argparse.ArgumentParser:
     propose.add_argument("--source-title", default=None)
     propose.add_argument("--unit", default=None)
     propose.add_argument("--module", action="store_true", help="Prefer scaffold-module intent")
-    propose.add_argument(
-        "--deterministic",
-        action="store_true",
-        help="Use deterministic LLM provider for reasoning paths",
-    )
     propose.set_defaults(func=cmd_graph_propose)
 
     eval_ret = graph_sub.add_parser("evaluate-retrieval", help="Run retrieval evaluation cases")

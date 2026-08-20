@@ -78,6 +78,16 @@ def search_concepts(
         "deterministic_match_count": len(identity.matches),
     }
 
+    if identity.matches and _has_filters(search_query):
+        filtered_matches: list[IdentityMatch] = []
+        for match in identity.matches:
+            candidate = _load_ranked_exact(engine, match)
+            if candidate is not None and _passes_filters(candidate, search_query):
+                filtered_matches.append(match)
+        identity = identity.model_copy(
+            update={"matches": filtered_matches, "is_ambiguous": len(filtered_matches) > 1}
+        )
+
     if identity.is_unique:
         match = identity.unique_match
         assert match is not None
@@ -287,8 +297,9 @@ def _tier1_hybrid(
 
     hybrid_modules: list[HybridModuleHit] = []
     modules_by_parent: dict[str, list[RankedModuleMatch]] = {}
-    for fused_rank, (module_id, fused_score) in enumerate(fused_modules, start=1):
-        if fused_rank > limits.modules:
+    parent_filter_cache: dict[str, bool] = {}
+    for module_id, fused_score in fused_modules:
+        if len(hybrid_modules) >= limits.modules:
             break
         fts_m = fts_mod_by_id.get(module_id)
         vec_m = vec_mod_by_id.get(module_id)
@@ -297,6 +308,23 @@ def _tier1_hybrid(
             if fts_m is not None
             else (vec_m.concept_id if vec_m is not None else "")
         )
+        if _has_filters(search_query):
+            if concept_id not in parent_filter_cache:
+                parent = _enrich_concept(
+                    engine,
+                    concept_id,
+                    fused_rank=0,
+                    fused_score=0.0,
+                    channels=[],
+                    matched_fields=[],
+                    overview_excerpt=None,
+                    matching_modules=[],
+                )
+                parent_filter_cache[concept_id] = bool(
+                    parent is not None and _passes_filters(parent, search_query)
+                )
+            if not parent_filter_cache[concept_id]:
+                continue
         title = (
             fts_m.title
             if fts_m is not None
@@ -338,7 +366,7 @@ def _tier1_hybrid(
             heading=heading,
             anchor=anchor,
             channels=channels,
-            fused_rank=fused_rank,
+            fused_rank=len(hybrid_modules) + 1,
             fused_score=fused_score,
         )
         hybrid_modules.append(hybrid)
@@ -401,34 +429,6 @@ def _tier1_hybrid(
     # Re-number fused_rank after filter drops
     for index, candidate in enumerate(ranked_concepts, start=1):
         candidate.fused_rank = index
-
-    if any(
-        (
-            search_query.filters.domains,
-            search_query.filters.concept_types,
-            search_query.filters.vault_statuses,
-            search_query.filters.review_statuses,
-        )
-    ):
-        parent_filter_cache: dict[str, bool] = {}
-        for module in hybrid_modules:
-            if module.concept_id not in parent_filter_cache:
-                parent = _enrich_concept(
-                    engine,
-                    module.concept_id,
-                    fused_rank=0,
-                    fused_score=0.0,
-                    channels=[],
-                    matched_fields=[],
-                    overview_excerpt=None,
-                    matching_modules=[],
-                )
-                parent_filter_cache[module.concept_id] = bool(
-                    parent is not None and _passes_filters(parent, search_query)
-                )
-        hybrid_modules = [
-            module for module in hybrid_modules if parent_filter_cache.get(module.concept_id, False)
-        ]
 
     if not ranked_concepts and not hybrid_modules:
         state = ResolutionState.NO_RESULTS
@@ -570,6 +570,16 @@ def _passes_filters(candidate: RankedConceptCandidate, query: ConceptSearchQuery
         candidate.review_status is not None and candidate.review_status in filters.review_statuses
     )
     return review_ok
+
+
+def _has_filters(query: ConceptSearchQuery) -> bool:
+    filters = query.filters
+    return bool(
+        filters.domains
+        or filters.concept_types
+        or filters.vault_statuses
+        or filters.review_statuses
+    )
 
 
 def _load_ranked_exact(engine: Engine, match: IdentityMatch) -> RankedConceptCandidate | None:
