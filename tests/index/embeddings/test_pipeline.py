@@ -140,6 +140,25 @@ def test_invalid_provider_vectors_are_rejected(
             return invalid_vector
 
     _upsert_minimal_concept(initialized_engine, "concept_invalid", title="Invalid")
+    with begin_connection(initialized_engine) as connection:
+        embeddings_repo.insert_embedding(
+            connection,
+            {
+                "owner_type": "concept",
+                "owner_id": "concept_invalid",
+                "parent_concept_id": "concept_invalid",
+                "segment_id": "",
+                "embedding_type": "concept_identity",
+                "vector": pack_vector([1.0, 0.0, 0.0, 0.0]),
+                "dimension": 4,
+                "model_id": "invalid-vector",
+                "model_revision": "test",
+                "normalizes_embeddings": True,
+                "input_hash": "hash-before-change",
+                "created_at": "2026-01-01T00:00:00Z",
+                "indexed_revision": 1,
+            },
+        )
     work = [
         EmbeddingWorkRequest(
             owner_type="concept",
@@ -161,6 +180,16 @@ def test_invalid_provider_vectors_are_rejected(
     assert report.failed == 1
     assert report.written == 0
     assert any("finite values" in error for error in report.errors)
+    with begin_connection(initialized_engine) as connection:
+        row = embeddings_repo.get_embedding_for_key(
+            connection,
+            owner_type="concept",
+            owner_id="concept_invalid",
+            embedding_type="concept_identity",
+        )
+    assert row is not None
+    assert int(row["dimension"]) == 0
+    assert row["input_hash"] == "hash-invalid"
 
 
 def test_matching_invalid_persisted_vector_is_regenerated(initialized_engine: Engine) -> None:

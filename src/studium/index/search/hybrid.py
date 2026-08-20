@@ -42,6 +42,7 @@ from studium.index.vector.models import ModelSpaceFilter, VectorConceptHit, Vect
 from studium.index.vector.protocol import VectorSearchBackend
 
 _FILTER_OVERFETCH_FACTOR = 8
+_MIN_VECTOR_SIMILARITY = 0.5
 
 
 class _ConceptOwnedHit(Protocol):
@@ -169,7 +170,7 @@ def _tier1_hybrid(
     limits = search_query.limits
     channel_limit = limits.channel
     capped_channels: list[str] = []
-    weights = dict(options.rrf_weights or DEFAULT_RRF_WEIGHTS)
+    weights = dict(DEFAULT_RRF_WEIGHTS if options.rrf_weights is None else options.rrf_weights)
     status = SearchStatus.COMPLETE
     channel_errors: list[str] = []
 
@@ -286,6 +287,10 @@ def _tier1_hybrid(
         else:
             diagnostics["vector_channels"] = "ok"
 
+    identity_hits = [hit for hit in identity_hits if hit.score >= _MIN_VECTOR_SIMILARITY]
+    semantic_hits = [hit for hit in semantic_hits if hit.score >= _MIN_VECTOR_SIMILARITY]
+    module_vector_hits = [hit for hit in module_vector_hits if hit.score >= _MIN_VECTOR_SIMILARITY]
+
     if channel_errors:
         diagnostics["channel_errors"] = channel_errors
     if capped_channels:
@@ -339,13 +344,9 @@ def _tier1_hybrid(
             [m.module_id for m in module_vector_hits]
         ),
     }
-    module_weights = {
-        SearchChannel.FTS.value: weights.get(SearchChannel.FTS.value, 1.0),
-        SearchChannel.MODULE_VECTOR.value: weights.get(SearchChannel.MODULE_VECTOR.value, 1.0),
-    }
     fused_modules = fuse_ranked_lists(
         module_channel_ranks,
-        channel_weights=module_weights,
+        channel_weights=weights,
         constant=options.rrf_constant,
     )
 

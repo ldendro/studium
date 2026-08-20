@@ -157,6 +157,20 @@ def process_embedding_work(
                         "vector must contain finite values and have non-zero norm"
                     )
                     report.failed += 1
+                    # Replace any prior valid row so changed content cannot remain
+                    # searchable through a stale vector.
+                    embeddings_repo.upsert_embedding(
+                        connection,
+                        _embedding_row_values(
+                            item,
+                            meta,
+                            parent_concept_id=parent_concept_id,
+                            vector_blob=b"",
+                            dimension=_REJECTION_DIMENSION,
+                            indexed_revision=indexed_revision,
+                            created_at=now,
+                        ),
+                    )
                     continue
                 embeddings_repo.upsert_embedding(
                     connection,

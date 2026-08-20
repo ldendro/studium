@@ -26,6 +26,8 @@ from studium.index.repositories import concepts
 from studium.index.repositories import embeddings as embeddings_repo
 from studium.index.search.models import ConceptSearchLimits
 from studium.index.search.rrf import fuse_ranked_lists, reciprocal_rank_score
+from studium.index.vector.models import VectorModuleHit
+from studium.index.vector.protocol import VectorSearchBackend
 from studium.vault import Vault
 from tests.index.sync.helpers import write_concept_note
 
@@ -269,4 +271,98 @@ def test_filtered_channels_incrementally_overfetch_with_a_fixed_cap(
 
 def test_empty_query_no_crash(initialized_engine: Engine) -> None:
     result = search_concepts(initialized_engine, "zzzz-nonexistent-query-xyz")
+    assert result.resolution_state == ResolutionState.NO_RESULTS
+
+
+def test_weak_vector_only_hits_are_rejected(initialized_engine: Engine) -> None:
+    _upsert_concept(initialized_engine, "concept_weak_vector", "Vector Candidate")
+    with begin_connection(initialized_engine) as connection:
+        for embedding_type in ("concept_identity", "concept_semantic"):
+            embeddings_repo.insert_embedding(
+                connection,
+                {
+                    "owner_type": "concept",
+                    "owner_id": "concept_weak_vector",
+                    "parent_concept_id": "concept_weak_vector",
+                    "segment_id": "",
+                    "embedding_type": embedding_type,
+                    "vector": pack_vector([1.0, 0.0]),
+                    "dimension": 2,
+                    "model_id": "weak-vector-model",
+                    "model_revision": "test",
+                    "normalizes_embeddings": True,
+                    "input_hash": f"hash-{embedding_type}",
+                    "created_at": _now(),
+                    "indexed_revision": 1,
+                },
+            )
+    result = search_concepts(
+        initialized_engine,
+        ConceptSearchQuery(text="utterly unrelated phrase", include_modules=False),
+        options=HybridSearchOptions(
+            query_identity_vector=[0.0, 1.0],
+            query_semantic_vector=[0.0, 1.0],
+            model_filter=ModelSpaceFilter(
+                model_id="weak-vector-model",
+                model_revision="test",
+                dimension=2,
+            ),
+        ),
+    )
+
+    assert result.resolution_state == ResolutionState.NO_RESULTS
+    assert result.ranked_concepts == []
+
+
+def test_partial_rrf_weights_disable_omitted_module_vector_channel(
+    initialized_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from studium.index.search import hybrid as hybrid_module
+
+    def module_vector_hits(
+        _engine: Engine,
+        _query_vector: list[float],
+        _model_filter: ModelSpaceFilter,
+        *,
+        limit: int = 20,
+        backend: VectorSearchBackend | None = None,
+    ) -> list[VectorModuleHit]:
+        del limit, backend
+        return [
+            VectorModuleHit(
+                module_id="module_vector_only",
+                concept_id="concept_parent",
+                module_title="Vector-only module",
+                parent_canonical_title="Parent",
+                embedding_type="module_semantic",
+                segment_id="module_vector_only:0",
+                rank=1,
+                score=0.9,
+                model_id="test-model",
+                model_revision="test",
+            )
+        ]
+
+    monkeypatch.setattr(
+        hybrid_module,
+        "search_module_semantic_vectors",
+        module_vector_hits,
+    )
+    result = search_concepts(
+        initialized_engine,
+        ConceptSearchQuery(text="no lexical match"),
+        options=HybridSearchOptions(
+            query_identity_vector=[1.0, 0.0],
+            query_semantic_vector=[1.0, 0.0],
+            model_filter=ModelSpaceFilter(
+                model_id="test-model",
+                model_revision="test",
+                dimension=2,
+            ),
+            rrf_weights={"fts": 1.0},
+        ),
+    )
+
+    assert result.module_hits == []
     assert result.resolution_state == ResolutionState.NO_RESULTS

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy.engine import Engine
 
 from studium.index import begin_connection
@@ -11,6 +12,7 @@ from studium.index.search.models import (
     ConceptSearchQuery,
     ConceptSearchResult,
     ExactMatchType,
+    HybridModuleHit,
     IdentityMatch,
     RankedConceptCandidate,
     ResolutionState,
@@ -23,6 +25,7 @@ from studium.recommend.models import (
     AddLearningEncounterRecommendation,
     AddScaffoldModuleRecommendation,
     CreateNewConceptRecommendation,
+    MarkRedundantRecommendation,
     RequestClarificationRecommendation,
     UseExistingConceptRecommendation,
 )
@@ -237,6 +240,110 @@ def test_module_intent_uses_module_reasoning(initialized_engine: Engine) -> None
     )
 
     assert isinstance(result, AddScaffoldModuleRecommendation)
+    assert result.target_concept_id == "concept_x"
+
+
+@pytest.mark.parametrize("target_id", [None, "concept_hallucinated"])
+def test_redundant_module_intent_requires_verified_target(
+    initialized_engine: Engine,
+    target_id: str | None,
+) -> None:
+    _upsert(initialized_engine, "concept_x", "Existing Concept")
+    search = ConceptSearchResult(
+        query=ConceptSearchQuery(text="Add a derivation module"),
+        index_revision=1,
+        search_status=SearchStatus.COMPLETE,
+        resolution_state=ResolutionState.RELATED_RESULTS,
+        ranked_concepts=[
+            RankedConceptCandidate(
+                concept_id="concept_x",
+                canonical_title="Existing Concept",
+                fused_rank=1,
+                fused_score=0.1,
+            )
+        ],
+    )
+
+    def handler(system_prompt: str, _user_prompt: str) -> dict[str, object]:
+        if "whether a query refers" in system_prompt:
+            return {
+                "classification": "distinct_related_concept",
+                "selected_concept_id": None,
+                "confidence": "medium",
+                "rationale": "Related but distinct.",
+                "evidence": [],
+            }
+        return {
+            "classification": "redundant",
+            "target_concept_id": target_id,
+            "confidence": "high",
+            "rationale": "The module already exists.",
+            "evidence": [],
+        }
+
+    result = recommend(
+        initialized_engine,
+        search=search,
+        provider=DeterministicLLMProvider(handler=handler),
+        module_intent=True,
+    )
+
+    assert isinstance(result, RequestClarificationRecommendation)
+
+
+def test_redundant_module_intent_requires_matching_module_evidence(
+    initialized_engine: Engine,
+) -> None:
+    _upsert(initialized_engine, "concept_x", "Existing Concept")
+    search = ConceptSearchResult(
+        query=ConceptSearchQuery(text="Add a derivation module"),
+        index_revision=1,
+        search_status=SearchStatus.COMPLETE,
+        resolution_state=ResolutionState.RELATED_RESULTS,
+        ranked_concepts=[
+            RankedConceptCandidate(
+                concept_id="concept_x",
+                canonical_title="Existing Concept",
+                fused_rank=1,
+                fused_score=0.1,
+            )
+        ],
+        module_hits=[
+            HybridModuleHit(
+                module_id="module_existing",
+                concept_id="concept_x",
+                title="Existing derivation",
+                fused_rank=1,
+                fused_score=0.1,
+            )
+        ],
+    )
+
+    def handler(system_prompt: str, _user_prompt: str) -> dict[str, object]:
+        if "whether a query refers" in system_prompt:
+            return {
+                "classification": "distinct_related_concept",
+                "selected_concept_id": None,
+                "confidence": "medium",
+                "rationale": "Related but distinct.",
+                "evidence": [],
+            }
+        return {
+            "classification": "redundant",
+            "target_concept_id": "concept_x",
+            "confidence": "high",
+            "rationale": "The module already exists.",
+            "evidence": ["matching module"],
+        }
+
+    result = recommend(
+        initialized_engine,
+        search=search,
+        provider=DeterministicLLMProvider(handler=handler),
+        module_intent=True,
+    )
+
+    assert isinstance(result, MarkRedundantRecommendation)
     assert result.target_concept_id == "concept_x"
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy.engine import Engine
 
 from studium.index import begin_connection
@@ -180,6 +181,34 @@ def test_encounter_outcomes(initialized_engine: Engine) -> None:
         initialized_engine, concept_id="concept_sgd", candidate=other_book
     )
     assert different.outcome == EncounterOutcome.DIFFERENT_SOURCE
+
+
+@pytest.mark.parametrize(
+    "identity_fields",
+    [
+        {"link": "https://example.com/course"},
+        {"external_id_type": "isbn", "external_id_value": "978-0-00-000000-0"},
+    ],
+)
+def test_source_identifier_additions_are_enrichment(identity_fields: dict[str, str]) -> None:
+    candidate = normalize_source_identity(
+        source_type="book",
+        source_title="Shared Source",
+        **identity_fields,
+    )
+    result = compare_against_rows(
+        [
+            {
+                "id": 1,
+                "concept_id": "concept_source",
+                "source_type": "book",
+                "source_title": "Shared Source",
+            }
+        ],
+        candidate=candidate,
+    )
+
+    assert result.outcome == EncounterOutcome.SAME_SOURCE_ENRICH_EXISTING
 
 
 def test_source_urls_preserve_case_sensitive_components() -> None:

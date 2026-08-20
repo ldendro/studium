@@ -228,7 +228,11 @@ def _is_enrichment(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
     compatible = _fields_compatible(existing, candidate)
     unit_enrich = not existing.unit and bool(candidate.unit)
     section_enrich = not existing.section and bool(candidate.section)
-    return compatible and (unit_enrich or section_enrich)
+    link_enrich = not existing.link and bool(candidate.link)
+    external_id_enrich = not (existing.external_id_type and existing.external_id_value) and bool(
+        candidate.external_id_type and candidate.external_id_value
+    )
+    return compatible and (unit_enrich or section_enrich or link_enrich or external_id_enrich)
 
 
 def _fields_compatible(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
@@ -238,6 +242,9 @@ def _fields_compatible(existing: SourceIdentity, candidate: SourceIdentity) -> b
             (existing.unit_type, candidate.unit_type),
             (existing.unit, candidate.unit),
             (existing.section, candidate.section),
+            (existing.link, candidate.link),
+            (existing.external_id_type, candidate.external_id_type),
+            (existing.external_id_value, candidate.external_id_value),
         )
     )
 

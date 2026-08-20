@@ -390,6 +390,10 @@ def recommend(
             if (
                 module_decision is not None
                 and module_decision.classification == ModuleIntentClassification.REDUNDANT
+                and module_target_id is not None
+                and module_target_id in candidate_ids
+                and _concept_exists(engine, module_target_id)
+                and any(hit.concept_id == module_target_id for hit in search.module_hits)
             ):
                 return MarkRedundantRecommendation(
                     confidence=ConfidenceLevel(module_decision.confidence.value),
