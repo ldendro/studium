@@ -9,7 +9,12 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from studium.schemas.enums import LearningRole, RelationshipType, ScaffoldModuleOrigin
+from studium.schemas.enums import (
+    LearningRole,
+    RelationshipType,
+    ScaffoldModuleOrigin,
+    SourceType,
+)
 
 
 class ConfidenceLevel(StrEnum):
@@ -136,7 +141,7 @@ class CreateNewConceptRecommendation(RecommendationEnvelope):
 class AddLearningEncounterRecommendation(RecommendationEnvelope):
     action: Literal["add_learning_encounter"] = "add_learning_encounter"
     target_concept_id: str
-    source_type: str
+    source_type: SourceType
     source_title: str
     unit: str | None = None
     comparison_outcome: str
@@ -147,6 +152,7 @@ class UpdateLearningEncounterRecommendation(RecommendationEnvelope):
     target_concept_id: str
     existing_encounter_id: int
     enrichment_fields: list[str] = Field(default_factory=_empty_strings)
+    enrichment_values: dict[str, str | None] = Field(default_factory=_empty_dict)
     comparison_outcome: str
 
 

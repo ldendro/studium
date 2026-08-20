@@ -197,7 +197,16 @@ def generate_evaluation_report(
         if positive_cases
         else 0.0
     )
-    mrr = sum(r.reciprocal_rank for r in retrieval) / max(1, len(retrieval))
+    mrr = (
+        sum(
+            retrieval_by_case[case.case_id].reciprocal_rank
+            for case in positive_cases
+            if case.case_id in retrieval_by_case
+        )
+        / len(positive_cases)
+        if positive_cases
+        else 0.0
+    )
     exact_cases = [
         case
         for case in cases

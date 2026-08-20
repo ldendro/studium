@@ -14,6 +14,7 @@ from studium.index.search.models import (
     ExactMatchType,
     IdentityMatch,
     ResolutionState,
+    SearchChannel,
 )
 from studium.llm.protocol import LLMProvider
 from studium.llm.reasoning.orchestrate import (
@@ -41,6 +42,7 @@ from studium.recommend.models import (
     UpdateLearningEncounterRecommendation,
     UseExistingConceptRecommendation,
 )
+from studium.schemas.enums import SourceType
 
 
 def _concept_exists(engine: Engine, concept_id: str) -> bool:
@@ -161,6 +163,7 @@ def recommend(
                 target_concept_id=intent_target_id,
                 existing_encounter_id=comparison.matched_encounter_id,
                 enrichment_fields=["unit"] if unit else [],
+                enrichment_values={"unit": unit} if unit else {},
                 comparison_outcome=comparison.outcome.value,
             )
         if comparison.outcome == EncounterOutcome.AMBIGUOUS:
@@ -184,7 +187,7 @@ def recommend(
             index_revision=revision,
             evidence=[comparison.outcome.value],
             target_concept_id=intent_target_id,
-            source_type=source_type,
+            source_type=SourceType(source_type),
             source_title=source_title,
             unit=unit,
             comparison_outcome=comparison.outcome.value,
@@ -351,7 +354,12 @@ def recommend(
         return _fallback_create_new(search, query_text, revision)
     if search.ranked_concepts:
         top = search.ranked_concepts[0]
-        if _concept_exists(engine, top.concept_id) and top.channels:
+        has_similarity_evidence = any(
+            channel.channel == SearchChannel.FTS
+            or (channel.score is not None and channel.score >= 0.5)
+            for channel in top.channels
+        )
+        if _concept_exists(engine, top.concept_id) and has_similarity_evidence:
             return UseExistingConceptRecommendation(
                 confidence=ConfidenceLevel.LOW,
                 completion_status=CompletionStatus.FALLBACK,

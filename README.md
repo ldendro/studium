@@ -104,6 +104,9 @@ uv run studium graph sync --vault /path/to/vault --json
 uv run studium graph status --vault /path/to/vault
 uv run studium graph find "stochastic gradient" --vault /path/to/vault --json
 uv run studium graph propose "SGD" --vault /path/to/vault --json
+uv run python evals/phase2/seed_vault.py /tmp/studium-phase2-eval-vault
+uv run studium graph sync --vault /tmp/studium-phase2-eval-vault
+uv run studium graph evaluate-retrieval --vault /tmp/studium-phase2-eval-vault
 uv run studium graph evaluate-retrieval --vault /path/to/vault
 ```
 
