@@ -482,6 +482,25 @@ def _resolve_query_vectors(
     if identity is None or semantic is None:
         if options.embedding_provider is None:
             return None, None, None, False
+        metadata = options.embedding_provider.model_metadata()
+        model_filter = options.model_filter
+        expected = (
+            model_filter.model_id,
+            model_filter.model_revision,
+            model_filter.dimension,
+            model_filter.normalizes_embeddings,
+        )
+        actual = (
+            metadata.model_id,
+            metadata.model_revision,
+            metadata.dimension,
+            metadata.normalizes_embeddings,
+        )
+        if actual != expected:
+            raise ValueError(
+                "Embedding provider metadata does not match the selected model space: "
+                f"expected {expected!r}, got {actual!r}"
+            )
         vector = embed_query(options.embedding_provider, text)
         identity = identity if identity is not None else vector
         semantic = semantic if semantic is not None else vector

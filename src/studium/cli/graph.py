@@ -16,6 +16,8 @@ from studium.evaluate import (
 )
 from studium.index import (
     IndexConfig,
+    ModelSpaceFilter,
+    SentenceTransformersEmbeddingProvider,
     create_engine_for_config,
     ensure_compatible_index,
     get_index_revision,
@@ -29,6 +31,7 @@ from studium.index.graph import (
     get_one_hop_neighborhood,
     get_prerequisites,
 )
+from studium.index.repositories import embeddings as embeddings_repo
 from studium.index.search.hybrid import HybridSearchOptions
 from studium.index.search.models import ConceptSearchQuery
 from studium.llm import DEFAULT_LLM_BASE_URL, DEFAULT_REASONING_MODEL
@@ -51,6 +54,31 @@ def _engine(config: IndexConfig):
     except (IndexNotInitializedError, IndexSchemaMismatchError):
         initialize_index(engine, config)
     return engine
+
+
+def _search_options(engine: Any) -> HybridSearchOptions:
+    """Use the newest persisted embedding space when its local provider is available."""
+    with engine.connect() as connection:
+        spaces = embeddings_repo.list_model_spaces(connection)
+    if not spaces:
+        return HybridSearchOptions()
+    space = spaces[0]
+    revision = None if space["model_revision"] is None else str(space["model_revision"])
+    try:
+        provider = SentenceTransformersEmbeddingProvider(
+            model_id=str(space["model_id"]),
+            revision=revision,
+            normalize_embeddings=bool(space["normalizes_embeddings"]),
+        )
+    except Exception:
+        return HybridSearchOptions()
+    model_filter = ModelSpaceFilter(
+        model_id=str(space["model_id"]),
+        model_revision=revision,
+        dimension=int(space["dimension"]),
+        normalizes_embeddings=bool(space["normalizes_embeddings"]),
+    )
+    return HybridSearchOptions(embedding_provider=provider, model_filter=model_filter)
 
 
 def _emit(payload: Any, *, as_json: bool, diagnostics: dict[str, Any] | None = None) -> int:
@@ -118,6 +146,7 @@ def cmd_graph_find(args: argparse.Namespace) -> int:
     result = search_concepts(
         engine,
         ConceptSearchQuery(text=args.query, include_diagnostics=args.diagnostics),
+        options=_search_options(engine),
     )
     diagnostics = result.diagnostics if args.diagnostics else None
     return _emit(result, as_json=args.json, diagnostics=diagnostics)
@@ -126,7 +155,7 @@ def cmd_graph_find(args: argparse.Namespace) -> int:
 def cmd_graph_candidates(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
-    result = search_concepts(engine, args.query)
+    result = search_concepts(engine, args.query, options=_search_options(engine))
     payload = {
         "ranked_concepts": [c.model_dump(mode="json") for c in result.ranked_concepts],
         "module_hits": [m.model_dump(mode="json") for m in result.module_hits],
@@ -145,7 +174,7 @@ def cmd_graph_inspect(args: argparse.Namespace) -> int:
 def cmd_graph_modules(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
-    result = search_concepts(engine, args.query)
+    result = search_concepts(engine, args.query, options=_search_options(engine))
     return _emit(
         {"module_hits": [m.model_dump(mode="json") for m in result.module_hits]},
         as_json=args.json,
@@ -167,7 +196,7 @@ def cmd_graph_relationships(args: argparse.Namespace) -> int:
 def cmd_graph_propose(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
-    search = search_concepts(engine, args.query)
+    search = search_concepts(engine, args.query, options=_search_options(engine))
     provider = None
     outcome = recommend(
         engine,
@@ -185,7 +214,7 @@ def cmd_graph_evaluate_retrieval(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
     cases = load_evaluation_cases(None if args.cases is None else Path(args.cases))
-    retrieval = run_retrieval_evaluation(engine, cases, options=HybridSearchOptions())
+    retrieval = run_retrieval_evaluation(engine, cases, options=_search_options(engine))
     report = generate_evaluation_report(
         cases=cases,
         retrieval=retrieval,
@@ -202,8 +231,9 @@ def cmd_graph_evaluate_recommendations(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
     cases = load_evaluation_cases(None if args.cases is None else Path(args.cases))
-    retrieval = run_retrieval_evaluation(engine, cases)
-    recommendations = run_recommendation_evaluation(engine, cases, provider=None)
+    options = _search_options(engine)
+    retrieval = run_retrieval_evaluation(engine, cases, options=options)
+    recommendations = run_recommendation_evaluation(engine, cases, provider=None, options=options)
     report = generate_evaluation_report(
         cases=cases,
         retrieval=retrieval,

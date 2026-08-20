@@ -9,6 +9,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from studium.schemas.enums import LearningRole, RelationshipType, ScaffoldModuleOrigin
+
 
 class ConfidenceLevel(StrEnum):
     LOW = "low"
@@ -76,6 +78,20 @@ def _empty_backlog() -> list[BacklogCandidate]:
     return []
 
 
+class GraphPositionSuggestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    relationship_type: RelationshipType
+    target_concept_id: str | None = None
+    target_title: str
+    learning_role: LearningRole
+    direction_note: str = ""
+
+
+def _empty_graph_positions() -> list[GraphPositionSuggestion]:
+    return []
+
+
 class MetadataSuggestions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -114,6 +130,7 @@ class CreateNewConceptRecommendation(RecommendationEnvelope):
     scope_summary: str = ""
     backlog_candidates: list[BacklogCandidate] = Field(default_factory=_empty_backlog)
     possible_match_ids: list[str] = Field(default_factory=_empty_strings)
+    graph_positions: list[GraphPositionSuggestion] = Field(default_factory=_empty_graph_positions)
 
 
 class AddLearningEncounterRecommendation(RecommendationEnvelope):
@@ -139,7 +156,7 @@ class AddScaffoldModuleRecommendation(RecommendationEnvelope):
     module_type: str
     module_title: str
     focus: str | None = None
-    origin: str = "agent_suggested"
+    origin: ScaffoldModuleOrigin = ScaffoldModuleOrigin.AGENT_RECOMMENDED
 
 
 class MarkRedundantRecommendation(RecommendationEnvelope):

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from sqlalchemy.engine import Engine
 
 from studium.index.graph.encounters import compare_learning_encounter, normalize_source_identity
@@ -26,6 +28,7 @@ from studium.recommend.models import (
     ConfidenceLevel,
     CreateNewConceptRecommendation,
     FailureStage,
+    GraphPositionSuggestion,
     MarkRedundantRecommendation,
     ReasoningMode,
     RecommendationFailure,
@@ -268,6 +271,16 @@ def recommend(
             BacklogCandidate(title=title, reason="missing_prerequisite")
             for title in data.get("prerequisite_titles", [])
         ]
+        candidate_ids = {candidate.concept_id for candidate in search.ranked_concepts}
+        graph_positions: list[GraphPositionSuggestion] = []
+        for raw in data.get("graph_positions", []):
+            if not isinstance(raw, dict):
+                continue
+            position = cast(dict[str, Any], raw)
+            target_id = position.get("target_concept_id")
+            if target_id is not None and str(target_id) not in candidate_ids:
+                continue
+            graph_positions.append(GraphPositionSuggestion.model_validate(position))
         return CreateNewConceptRecommendation(
             confidence=ConfidenceLevel(str(data.get("confidence", "medium"))),
             completion_status=CompletionStatus.COMPLETE,
@@ -275,11 +288,12 @@ def recommend(
             index_revision=revision,
             evidence=list(data.get("evidence", [])),
             suggested_title=query_text,
-            suggested_concept_type=str(data.get("suggested_concept_type", "atomic_concept")),
+            suggested_concept_type=str(data.get("suggested_concept_type", "general_concept")),
             suggested_domains=[str(d) for d in data.get("suggested_domains", [])],
             scope_summary=str(data.get("scope_summary", "")),
             backlog_candidates=backlog,
             possible_match_ids=[c.concept_id for c in search.ranked_concepts[:5]],
+            graph_positions=graph_positions,
         )
 
     # No provider: deterministic fallbacks from search state
@@ -314,7 +328,7 @@ def _fallback_create_new(
         evidence=["no_strong_match"],
         warnings=["Created without LLM analysis"],
         suggested_title=query_text,
-        suggested_concept_type="atomic_concept",
+        suggested_concept_type="general_concept",
         suggested_domains=[],
         scope_summary="",
         backlog_candidates=[],
