@@ -258,10 +258,16 @@ def generate_evaluation_report(
         )
         for case in cases
     )
+    tier1_status_met = retrieval_coverage_met and all(
+        retrieval_by_case[case.case_id].resolution_state == ResolutionState.EXACT_MATCH.value
+        or retrieval_by_case[case.case_id].search_status == "complete"
+        for case in cases
+    )
     retrieval_met = (
         exact_acc >= thresholds["exact_lookup_accuracy"]
         and (not positive_cases or recall >= thresholds["recall_at_5"])
         and case_constraints_met
+        and tier1_status_met
     )
     recommendation_met = (
         len(recommendations) == len(cases)

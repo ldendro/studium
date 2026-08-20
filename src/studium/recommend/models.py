@@ -13,6 +13,7 @@ from studium.schemas.enums import (
     LearningRole,
     RelationshipType,
     ScaffoldModuleOrigin,
+    ScaffoldModuleType,
     SourceType,
 )
 
@@ -159,7 +160,7 @@ class UpdateLearningEncounterRecommendation(RecommendationEnvelope):
 class AddScaffoldModuleRecommendation(RecommendationEnvelope):
     action: Literal["add_scaffold_module"] = "add_scaffold_module"
     target_concept_id: str
-    module_type: str
+    module_type: ScaffoldModuleType
     module_title: str
     focus: str | None = None
     origin: ScaffoldModuleOrigin = ScaffoldModuleOrigin.AGENT_RECOMMENDED

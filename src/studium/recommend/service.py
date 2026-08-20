@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from pydantic import ValidationError
 from sqlalchemy.engine import Engine
 
 from studium.index.graph.encounters import compare_learning_encounter, normalize_source_identity
@@ -47,7 +48,7 @@ from studium.recommend.models import (
     UpdateLearningEncounterRecommendation,
     UseExistingConceptRecommendation,
 )
-from studium.schemas.enums import SourceType
+from studium.schemas.enums import ScaffoldModuleType, SourceType
 
 
 def _concept_exists(engine: Engine, concept_id: str) -> bool:
@@ -242,7 +243,7 @@ def recommend(
             index_revision=revision,
             evidence=["module_intent_target"],
             target_concept_id=intent_target_id,
-            module_type="derivation",
+            module_type=ScaffoldModuleType.DERIVATION,
             module_title=query_text[:80] or "New module",
             focus=None,
         )
@@ -360,11 +361,14 @@ def recommend(
 
         if module_intent:
             module_result = reason_module_intent(provider, search)
-            module_decision = (
-                ScaffoldModuleIntentDecision.model_validate(module_result.data)
-                if module_result.ok and module_result.data is not None
-                else None
-            )
+            module_decision: ScaffoldModuleIntentDecision | None = None
+            if module_result.ok and module_result.data is not None:
+                try:
+                    module_decision = ScaffoldModuleIntentDecision.model_validate(
+                        module_result.data
+                    )
+                except ValidationError:
+                    module_decision = None
             candidate_ids = {candidate.concept_id for candidate in search.ranked_concepts}
             module_target_id = (
                 None if module_decision is None else module_decision.target_concept_id
@@ -383,7 +387,9 @@ def recommend(
                     index_revision=revision,
                     evidence=[*module_decision.evidence, module_decision.rationale],
                     target_concept_id=module_target_id,
-                    module_type=module_decision.suggested_module_type or "derivation",
+                    module_type=(
+                        module_decision.suggested_module_type or ScaffoldModuleType.DERIVATION
+                    ),
                     module_title=module_decision.suggested_title or query_text[:80],
                     focus=module_decision.suggested_focus,
                 )

@@ -7,7 +7,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from studium.schemas.concept_note import ConceptDomain
-from studium.schemas.enums import ConceptType, LearningRole, RelationshipType
+from studium.schemas.enums import ConceptType, LearningRole, RelationshipType, ScaffoldModuleType
 
 
 class ConfidenceLevel(StrEnum):
@@ -83,7 +83,7 @@ class ScaffoldModuleIntentDecision(BaseModel):
 
     classification: ModuleIntentClassification
     target_concept_id: str | None = None
-    suggested_module_type: str | None = None
+    suggested_module_type: ScaffoldModuleType | None = None
     suggested_title: str | None = None
     suggested_focus: str | None = None
     confidence: ConfidenceLevel

@@ -89,7 +89,7 @@ def _reasoning_provider() -> LLMProvider | None:
 
 
 def _search_options(engine: Any) -> HybridSearchOptions:
-    """Use the newest persisted embedding space when its local provider is available."""
+    """Use the best-covered persisted embedding space with an available provider."""
     with engine.connect() as connection:
         spaces = embeddings_repo.list_model_spaces(connection)
     if not spaces:
@@ -127,15 +127,38 @@ def _emit(payload: Any, *, as_json: bool, diagnostics: dict[str, Any] | None = N
             data = {"result": data, "diagnostics": diagnostics}
         print(json.dumps(data, indent=2, default=str))
         return exit_code
-    if hasattr(payload, "model_dump"):
-        dumped = payload.model_dump(mode="json")
-        print(json.dumps(dumped, indent=2, default=str))
-    else:
-        print(payload)
+    data = payload.model_dump(mode="json") if hasattr(payload, "model_dump") else payload
+    print("\n".join(_human_lines(data)))
     if diagnostics:
-        print("--- diagnostics ---")
-        print(json.dumps(diagnostics, indent=2, default=str))
+        print("Diagnostics:")
+        print("\n".join(_human_lines(diagnostics, indent=2)))
     return exit_code
+
+
+def _human_lines(value: Any, *, indent: int = 0, label: str | None = None) -> list[str]:
+    """Render command payloads without exposing JSON or Python representations."""
+    prefix = " " * indent
+    heading = None if label is None else label.replace("_", " ").capitalize()
+    if isinstance(value, dict):
+        lines = [] if heading is None else [f"{prefix}{heading}:"]
+        child_indent = indent if heading is None else indent + 2
+        for key, item in cast(dict[str, Any], value).items():
+            if item in (None, "", [], {}):
+                continue
+            lines.extend(_human_lines(item, indent=child_indent, label=str(key)))
+        return lines or ([f"{prefix}{heading}: none"] if heading is not None else [f"{prefix}None"])
+    if isinstance(value, list):
+        items = cast(list[Any], value)
+        if not items:
+            return []
+        if all(not isinstance(item, (dict, list)) for item in items):
+            return [f"{prefix}{heading}: {', '.join(str(item) for item in items)}"]
+        lines = [] if heading is None else [f"{prefix}{heading}:"]
+        for index, item in enumerate(items, start=1):
+            lines.append(f"{' ' * (indent + 2)}{index}.")
+            lines.extend(_human_lines(item, indent=indent + 4))
+        return lines
+    return [f"{prefix}{heading}: {value}" if heading is not None else f"{prefix}{value}"]
 
 
 def _payload_exit_code(payload: Any) -> int:
@@ -172,7 +195,12 @@ def cmd_graph_sync(args: argparse.Namespace) -> int:
         report = sync_vault(vault, engine, config)
         payload: Any = {
             "sync": report.model_dump(mode="json"),
-            "embeddings": {"status": "unavailable", "error": str(exc)},
+            "embeddings": {
+                "status": "unavailable",
+                "error": str(exc),
+                "pending_work": len(report.embedding_work),
+                "retry": "graph sync reconstructs work from the current index projections",
+            },
         }
     else:
         combined = sync_and_embed(vault, engine, config, provider)
@@ -200,7 +228,12 @@ def cmd_graph_rebuild(args: argparse.Namespace) -> int:
     except Exception as exc:
         payload: Any = {
             "sync": report.model_dump(mode="json"),
-            "embeddings": {"status": "unavailable", "error": str(exc)},
+            "embeddings": {
+                "status": "unavailable",
+                "error": str(exc),
+                "pending_work": len(report.embedding_work),
+                "retry": "graph sync reconstructs work from the current index projections",
+            },
         }
     else:
         embedding_report = process_embedding_work(
@@ -256,7 +289,7 @@ def cmd_graph_candidates(args: argparse.Namespace) -> int:
     }
     if args.diagnostics:
         payload["diagnostics"] = result.diagnostics
-    return _emit(payload, as_json=True)
+    return _emit(payload, as_json=args.json)
 
 
 def cmd_graph_inspect(args: argparse.Namespace) -> int:

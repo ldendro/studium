@@ -159,3 +159,27 @@ def test_related_prohibited_identity_does_not_fail_retrieval_gate() -> None:
     report = generate_evaluation_report(cases=[case], retrieval=retrieval, recommendations=[])
 
     assert report.thresholds_met is True
+
+
+def test_partial_tier1_search_does_not_pass_hybrid_retrieval_gate() -> None:
+    case = EvaluationCase(
+        case_id="tier1-partial",
+        query="related query",
+        required_candidate_ids=["concept-related"],
+        expected_resolution_states=["related_results"],
+    )
+    retrieval = [
+        RetrievalCaseResult(
+            case_id=case.case_id,
+            hit=True,
+            reciprocal_rank=1.0,
+            ranked_ids=["concept-related"],
+            resolution_state="related_results",
+            search_status="partial",
+        )
+    ]
+
+    report = generate_evaluation_report(cases=[case], retrieval=retrieval, recommendations=[])
+
+    assert report.recall_at_5 == 1.0
+    assert report.thresholds_met is False

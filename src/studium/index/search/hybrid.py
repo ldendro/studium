@@ -351,7 +351,9 @@ def _tier1_hybrid(
     )
 
     fts_mod_by_id = {m.module_id: m for m in fts_modules}
-    vec_mod_by_id = {m.module_id: m for m in module_vector_hits}
+    vec_mod_by_id: dict[str, VectorModuleHit] = {}
+    for module_hit in module_vector_hits:
+        vec_mod_by_id.setdefault(module_hit.module_id, module_hit)
 
     hybrid_modules: list[HybridModuleHit] = []
     modules_by_parent: dict[str, list[RankedModuleMatch]] = {}
@@ -412,7 +414,11 @@ def _tier1_hybrid(
         anchor = (
             fts_m.anchor if fts_m is not None else (vec_m.anchor if vec_m is not None else None)
         )
-        module_type = fts_m.module_type if fts_m is not None else None
+        module_type = (
+            fts_m.module_type
+            if fts_m is not None
+            else (vec_m.module_type if vec_m is not None else None)
+        )
         segment_id = vec_m.segment_id if vec_m is not None else ""
         hybrid = HybridModuleHit(
             module_id=module_id,

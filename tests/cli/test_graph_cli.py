@@ -156,6 +156,59 @@ def test_graph_rebuild_regenerates_embeddings(
     assert payload["embeddings"]["written"] >= 2
 
 
+def test_graph_sync_reconstructs_embedding_work_after_provider_outage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    vault = tmp_path / "vault"
+    app = tmp_path / "app"
+    vault.mkdir()
+    app.mkdir()
+    write_concept_note(
+        vault,
+        "concepts/retry.md",
+        id="concept_retry_aaaaaa",
+        canonical_title="Retry Concept",
+    )
+
+    def unavailable_provider() -> FakeEmbeddingProvider:
+        raise RuntimeError("model unavailable")
+
+    monkeypatch.setattr(graph, "SentenceTransformersEmbeddingProvider", unavailable_provider)
+    assert main(["graph", "sync", "--vault", str(vault), "--app-data", str(app), "--json"]) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert first["embeddings"]["pending_work"] >= 2
+
+    monkeypatch.setattr(
+        graph,
+        "SentenceTransformersEmbeddingProvider",
+        lambda: FakeEmbeddingProvider(),
+    )
+    assert main(["graph", "sync", "--vault", str(vault), "--app-data", str(app), "--json"]) == 0
+    second = json.loads(capsys.readouterr().out)
+    assert second["sync"]["counts"]["unchanged"] == 1
+    assert second["embeddings"]["written"] >= 2
+
+
+def test_graph_status_default_output_is_human_readable(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    vault = tmp_path / "vault"
+    app = tmp_path / "app"
+    vault.mkdir()
+    app.mkdir()
+    assert main(["graph", "sync", "--vault", str(vault), "--app-data", str(app)]) == 0
+    capsys.readouterr()
+
+    assert main(["graph", "status", "--vault", str(vault), "--app-data", str(app)]) == 0
+    output = capsys.readouterr().out
+    assert "Index revision:" in output
+    assert "{" not in output
+    assert '"index_revision"' not in output
+
+
 def test_graph_modules_bypasses_exact_concept_identity(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -269,6 +322,7 @@ def test_graph_propose_uses_healthy_reasoning_provider(
 
 def test_graph_recommendation_evaluation_classifies_retrieved_fixture_candidate(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     vault = tmp_path / "vault"
@@ -276,6 +330,23 @@ def test_graph_recommendation_evaluation_classifies_retrieved_fixture_candidate(
     cases = tmp_path / "case.yaml"
     vault.mkdir()
     app.mkdir()
+
+    def embedding_provider(
+        model_id: str = "fake-embedding",
+        *,
+        revision: str | None = "test",
+        device: str | None = None,
+        normalize_embeddings: bool = True,
+        batch_size: int = 32,
+    ) -> FakeEmbeddingProvider:
+        del device, batch_size
+        return FakeEmbeddingProvider(
+            model_id=model_id,
+            model_revision=revision,
+            normalizes_embeddings=normalize_embeddings,
+        )
+
+    monkeypatch.setattr(graph, "SentenceTransformersEmbeddingProvider", embedding_provider)
     write_concept_note(
         vault,
         "concepts/six.md",

@@ -174,6 +174,7 @@ def rank_module_hits(
                     score=float(scores[index]),
                     model_id=row.model_id,
                     model_revision=row.model_revision,
+                    module_type=None if module is None else _optional_str(module.get("type")),
                     heading=None if module is None else _optional_str(module.get("heading")),
                     anchor=None if module is None else _optional_str(module.get("anchor")),
                 )

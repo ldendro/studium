@@ -119,6 +119,8 @@ def list_model_spaces(connection: Connection) -> list[dict[str, Any]]:
             embeddings.c.model_revision,
             embeddings.c.dimension,
             embeddings.c.normalizes_embeddings,
+            func.count().label("embedding_count"),
+            func.count(func.distinct(embeddings.c.parent_concept_id)).label("concept_count"),
             func.max(embeddings.c.created_at).label("created_at"),
             func.max(embeddings.c.indexed_revision).label("indexed_revision"),
         )
@@ -129,7 +131,12 @@ def list_model_spaces(connection: Connection) -> list[dict[str, Any]]:
             embeddings.c.dimension,
             embeddings.c.normalizes_embeddings,
         )
-        .order_by(func.max(embeddings.c.created_at).desc(), embeddings.c.model_id)
+        .order_by(
+            func.count(func.distinct(embeddings.c.parent_concept_id)).desc(),
+            func.count().desc(),
+            func.max(embeddings.c.created_at).desc(),
+            embeddings.c.model_id,
+        )
     ).all()
     return [mapping(row) for row in rows]
 

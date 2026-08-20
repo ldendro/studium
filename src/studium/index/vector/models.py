@@ -47,5 +47,6 @@ class VectorModuleHit(BaseModel):
     score: float
     model_id: str
     model_revision: str | None = None
+    module_type: str | None = None
     heading: str | None = None
     anchor: str | None = None

@@ -366,3 +366,54 @@ def test_partial_rrf_weights_disable_omitted_module_vector_channel(
 
     assert result.module_hits == []
     assert result.resolution_state == ResolutionState.NO_RESULTS
+
+
+def test_module_fusion_preserves_best_vector_segment(
+    initialized_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from studium.index.search import hybrid as hybrid_module
+
+    def module_vector_hits(
+        _engine: Engine,
+        _query_vector: list[float],
+        _model_filter: ModelSpaceFilter,
+        *,
+        limit: int = 20,
+        backend: VectorSearchBackend | None = None,
+    ) -> list[VectorModuleHit]:
+        del limit, backend
+        common = {
+            "module_id": "module_segmented",
+            "concept_id": "concept_parent",
+            "module_title": "Segmented module",
+            "parent_canonical_title": "Parent",
+            "embedding_type": "module_semantic",
+            "model_id": "test-model",
+            "model_revision": "test",
+            "module_type": "worked_example",
+        }
+        return [
+            VectorModuleHit(**common, segment_id="module_segmented:0", rank=1, score=0.95),
+            VectorModuleHit(**common, segment_id="module_segmented:1", rank=2, score=0.80),
+        ]
+
+    monkeypatch.setattr(hybrid_module, "search_module_semantic_vectors", module_vector_hits)
+    result = search_concepts(
+        initialized_engine,
+        ConceptSearchQuery(text="segment query"),
+        options=HybridSearchOptions(
+            query_identity_vector=[1.0, 0.0],
+            query_semantic_vector=[1.0, 0.0],
+            model_filter=ModelSpaceFilter(
+                model_id="test-model",
+                model_revision="test",
+                dimension=2,
+            ),
+        ),
+    )
+
+    assert len(result.module_hits) == 1
+    assert result.module_hits[0].segment_id == "module_segmented:0"
+    assert result.module_hits[0].channels[0].rank == 1
+    assert result.module_hits[0].module_type == "worked_example"

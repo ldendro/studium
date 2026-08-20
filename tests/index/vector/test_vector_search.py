@@ -176,6 +176,34 @@ def test_model_filter_excludes_mismatched_space(initialized_engine: Engine) -> N
     assert [h.concept_id for h in hits] == ["concept_ok"]
 
 
+def test_model_spaces_prefer_corpus_coverage_over_recency(initialized_engine: Engine) -> None:
+    _upsert_concept(initialized_engine, "concept_covered_a", "Covered A")
+    _upsert_concept(initialized_engine, "concept_covered_b", "Covered B")
+    for concept_id in ("concept_covered_a", "concept_covered_b"):
+        _insert_embedding(
+            initialized_engine,
+            owner_type="concept",
+            owner_id=concept_id,
+            embedding_type="concept_identity",
+            vector=[1.0, 0.0],
+            model_id="complete-model",
+        )
+    _insert_embedding(
+        initialized_engine,
+        owner_type="concept",
+        owner_id="concept_covered_a",
+        embedding_type="concept_semantic",
+        vector=[1.0, 0.0],
+        model_id="new-partial-model",
+    )
+
+    with initialized_engine.connect() as connection:
+        spaces = embeddings_repo.list_model_spaces(connection)
+
+    assert spaces[0]["model_id"] == "complete-model"
+    assert int(spaces[0]["concept_count"]) == 2
+
+
 def test_rejection_rows_excluded(initialized_engine: Engine) -> None:
     _upsert_concept(initialized_engine, "concept_live", "Live")
     _upsert_concept(initialized_engine, "concept_reject", "Reject")
@@ -257,6 +285,7 @@ def test_module_hits_include_location_fields(initialized_engine: Engine) -> None
     assert hit.module_id == "module_one"
     assert hit.concept_id == "concept_parent"
     assert hit.parent_canonical_title == "Parent"
+    assert hit.module_type == "derivation"
     assert hit.heading == "Update Rule"
     assert hit.anchor == "update-rule"
     assert hit.segment_id == ""
