@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 
+import pytest
+
+from studium.cli import graph
 from studium.cli.main import main
+from studium.index import FakeEmbeddingProvider
+from studium.index.errors import IndexNotInitializedError
+from studium.llm import DeterministicLLMProvider
 from tests.index.sync.helpers import write_concept_note
 
 
@@ -77,3 +85,174 @@ def test_graph_status_and_sync(tmp_path: Path) -> None:
         )
         == 0
     )
+
+
+def test_graph_read_rejects_unsynced_vault(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    app = tmp_path / "app"
+    vault.mkdir()
+    app.mkdir()
+
+    with pytest.raises(IndexNotInitializedError):
+        main(
+            [
+                "graph",
+                "find",
+                "Missing",
+                "--vault",
+                str(vault),
+                "--app-data",
+                str(app),
+                "--json",
+            ]
+        )
+
+
+def test_graph_rebuild_regenerates_embeddings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    vault = tmp_path / "vault"
+    app = tmp_path / "app"
+    vault.mkdir()
+    app.mkdir()
+    write_concept_note(
+        vault,
+        "concepts/a.md",
+        id="concept_rebuild_aaaaaa",
+        canonical_title="Rebuild Concept",
+    )
+    monkeypatch.setattr(
+        graph,
+        "SentenceTransformersEmbeddingProvider",
+        lambda: FakeEmbeddingProvider(),
+    )
+
+    assert (
+        main(
+            [
+                "graph",
+                "rebuild",
+                "--vault",
+                str(vault),
+                "--app-data",
+                str(app),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["embeddings"]["written"] >= 2
+
+
+def test_graph_modules_bypasses_exact_concept_identity(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    vault = tmp_path / "vault"
+    app = tmp_path / "app"
+    vault.mkdir()
+    app.mkdir()
+    write_concept_note(
+        vault,
+        "concepts/a.md",
+        id="concept_modules_aaaaaa",
+        canonical_title="Exact Module Term",
+        modules_yaml=(
+            "scaffold_modules:\n"
+            "  - id: module_exact_aaaaaa\n"
+            "    type: derivation\n"
+            "    title: Exact Module Term\n"
+            "    status: scaffolded\n"
+            "    origin:\n"
+            "    focus: exact module lookup\n"
+        ),
+    )
+    assert main(["graph", "sync", "--vault", str(vault), "--app-data", str(app)]) == 0
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "graph",
+                "modules",
+                "Exact Module Term",
+                "--vault",
+                str(vault),
+                "--app-data",
+                str(app),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["module_hits"][0]["module_id"] == "module_exact_aaaaaa"
+
+
+def test_graph_propose_uses_healthy_reasoning_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    vault = tmp_path / "vault"
+    app = tmp_path / "app"
+    vault.mkdir()
+    app.mkdir()
+    assert main(["graph", "sync", "--vault", str(vault), "--app-data", str(app)]) == 0
+    capsys.readouterr()
+
+    def _reasoning_response(system_prompt: str, _user_prompt: str) -> dict[str, Any]:
+        if "whether a query refers to an existing concept" in system_prompt:
+            return {
+                "classification": "insufficient_information",
+                "selected_concept_id": None,
+                "confidence": "low",
+                "rationale": "No verified identity candidate.",
+                "evidence": ["test_provider"],
+            }
+        if "clarification" in system_prompt.lower():
+            return {
+                "needs_clarification": False,
+                "ambiguity_type": "none",
+                "candidate_interpretations": [],
+                "clarification_message": "No clarification required.",
+                "confidence": "medium",
+                "evidence": ["test_provider"],
+            }
+        return {
+            "suggested_concept_type": "general_concept",
+            "suggested_domains": [],
+            "scope_summary": "Test provider suggestion.",
+            "graph_positions": [],
+            "prerequisite_titles": [],
+            "confidence": "medium",
+            "rationale": "No existing concept was verified.",
+            "evidence": ["test_provider"],
+        }
+
+    provider = DeterministicLLMProvider(handler=_reasoning_response)
+
+    def _provider(**_kwargs: Any) -> DeterministicLLMProvider:
+        return provider
+
+    monkeypatch.setattr(graph, "OpenAICompatibleProvider", _provider)
+    assert (
+        main(
+            [
+                "graph",
+                "propose",
+                "Novel Topic",
+                "--vault",
+                str(vault),
+                "--app-data",
+                str(app),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["reasoning_mode"] == "llm"

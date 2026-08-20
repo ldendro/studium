@@ -22,12 +22,14 @@ from studium.index import (
     ensure_compatible_index,
     get_index_revision,
     initialize_index,
+    process_embedding_work,
     rebuild_vault_index,
     search_concepts,
+    search_modules_fts,
     sync_and_embed,
     sync_vault,
 )
-from studium.index.errors import IndexNotInitializedError, IndexSchemaMismatchError
+from studium.index.errors import IndexNotInitializedError
 from studium.index.graph import (
     get_one_hop_neighborhood,
     get_prerequisites,
@@ -39,6 +41,8 @@ from studium.llm import (
     DEFAULT_LLM_BASE_URL,
     DEFAULT_REASONING_MODEL,
     DeterministicLLMProvider,
+    LLMProvider,
+    OpenAICompatibleProvider,
 )
 from studium.recommend import recommend
 from studium.vault import Vault
@@ -55,11 +59,32 @@ def _config_from_args(args: argparse.Namespace) -> IndexConfig:
 def _engine(config: IndexConfig):
     Vault(config.resolved_vault_root)
     engine = create_engine_for_config(config)
+    ensure_compatible_index(engine)
+    return engine
+
+
+def _sync_engine(config: IndexConfig):
+    """Open an index for sync, initializing only a previously absent schema."""
+    Vault(config.resolved_vault_root)
+    engine = create_engine_for_config(config)
     try:
         ensure_compatible_index(engine)
-    except (IndexNotInitializedError, IndexSchemaMismatchError):
+    except IndexNotInitializedError:
         initialize_index(engine, config)
     return engine
+
+
+def _reasoning_provider() -> LLMProvider | None:
+    """Return the configured local provider only when it is ready."""
+    try:
+        provider = OpenAICompatibleProvider(
+            base_url=DEFAULT_LLM_BASE_URL,
+            model_id=DEFAULT_REASONING_MODEL,
+        )
+        health = provider.check_health()
+    except Exception:
+        return None
+    return provider if health.healthy and health.ready else None
 
 
 def _search_options(engine: Any) -> HybridSearchOptions:
@@ -132,7 +157,7 @@ def _payload_exit_code(payload: Any) -> int:
 
 def cmd_graph_sync(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
-    engine = _engine(config)
+    engine = _sync_engine(config)
     vault = Vault(config.resolved_vault_root)
     try:
         provider = SentenceTransformersEmbeddingProvider()
@@ -158,12 +183,30 @@ def cmd_graph_sync(args: argparse.Namespace) -> int:
 def cmd_graph_rebuild(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = create_engine_for_config(config)
-    _engine_out, report = rebuild_vault_index(
+    rebuilt_engine, report = rebuild_vault_index(
         Vault(config.resolved_vault_root),
         config,
         existing_engine=engine,
     )
-    return _emit(report, as_json=args.json)
+    try:
+        provider = SentenceTransformersEmbeddingProvider()
+    except Exception as exc:
+        payload: Any = {
+            "sync": report.model_dump(mode="json"),
+            "embeddings": {"status": "unavailable", "error": str(exc)},
+        }
+    else:
+        embedding_report = process_embedding_work(
+            rebuilt_engine,
+            report.embedding_work,
+            provider,
+            indexed_revision=report.revision_after,
+        )
+        payload = {
+            "sync": report.model_dump(mode="json"),
+            "embeddings": embedding_report.model_dump(mode="json"),
+        }
+    return _emit(payload, as_json=args.json)
 
 
 def cmd_graph_status(args: argparse.Namespace) -> int:
@@ -219,9 +262,9 @@ def cmd_graph_inspect(args: argparse.Namespace) -> int:
 def cmd_graph_modules(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
-    result = search_concepts(engine, args.query, options=_search_options(engine))
+    module_hits = search_modules_fts(engine, args.query)
     return _emit(
-        {"module_hits": [m.model_dump(mode="json") for m in result.module_hits]},
+        {"module_hits": [hit.model_dump(mode="json") for hit in module_hits]},
         as_json=args.json,
     )
 
@@ -242,7 +285,7 @@ def cmd_graph_propose(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
     search = search_concepts(engine, args.query, options=_search_options(engine))
-    provider = None
+    provider = _reasoning_provider()
     outcome = recommend(
         engine,
         search=search,

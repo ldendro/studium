@@ -10,7 +10,12 @@ DOMAINS = ("math", "systems", "biology", "history", "ml")
 
 def _note(index: int) -> str:
     domain = DOMAINS[(index - 1) % 5]
-    title = f"Exact Title {index}" if index <= 5 else f"Sample query {index} about {domain}"
+    title = f"Exact Title {index}" if index <= 5 else f"{domain.title()} Sample Topic {index}"
+    overview = (
+        f"Deterministic fixture for Phase 2 evaluation case p2-{index:03d}."
+        if index <= 5
+        else f"A sample learning query about {domain}, fixture number {index}."
+    )
     return f"""---
 id: concept_eval_{index:03d}
 schema_version: 2
@@ -40,7 +45,7 @@ updated_at: 2026-08-20T00:00:00Z
 
 ## Concept Overview
 
-Deterministic fixture for Phase 2 evaluation case p2-{index:03d}.
+{overview}
 
 ## Prerequisites
 
