@@ -243,9 +243,14 @@ def _tier1_hybrid(
     if channel_errors:
         diagnostics["channel_errors"] = channel_errors
 
-    # Concept-level ranks (module vector contributes parent concept ids).
+    # Concept-level ranks (lexical and vector module hits contribute parent ids).
+    lexical_concept_ranks = ranks_from_ordered_ids([hit.concept_id for hit in fts_concepts])
+    for hit in fts_modules:
+        current_rank = lexical_concept_ranks.get(hit.concept_id)
+        if current_rank is None or hit.rank < current_rank:
+            lexical_concept_ranks[hit.concept_id] = hit.rank
     channel_ranks: dict[str, dict[str, int]] = {
-        SearchChannel.FTS.value: ranks_from_ordered_ids([hit.concept_id for hit in fts_concepts]),
+        SearchChannel.FTS.value: lexical_concept_ranks,
         SearchChannel.IDENTITY_VECTOR.value: ranks_from_ordered_ids(
             [hit.concept_id for hit in identity_hits]
         ),

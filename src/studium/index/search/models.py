@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ExactMatchType(StrEnum):
@@ -152,6 +152,14 @@ class ConceptSearchQuery(BaseModel):
     limits: ConceptSearchLimits = Field(default_factory=ConceptSearchLimits)
     include_modules: bool = True
     include_diagnostics: bool = False
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("search text must not be empty")
+        return value
 
 
 class ChannelContribution(BaseModel):

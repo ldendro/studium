@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from studium.schemas.enums import ConceptType, LearningRole, RelationshipType
 
@@ -29,6 +29,14 @@ class ConceptIdentityDecision(BaseModel):
     confidence: ConfidenceLevel
     rationale: str
     evidence: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_same_concept_target(self) -> ConceptIdentityDecision:
+        if self.classification == IdentityClassification.SAME_CONCEPT and not (
+            self.selected_concept_id and self.selected_concept_id.strip()
+        ):
+            raise ValueError("same_concept decisions require selected_concept_id")
+        return self
 
 
 class GraphPositionHint(BaseModel):

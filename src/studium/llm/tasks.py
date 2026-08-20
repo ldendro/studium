@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,7 +37,8 @@ class TaskDefinition:
 
 def render_user_prompt(template: str, values: dict[str, Any]) -> str:
     """Simple ``{key}`` substitution for task user prompts."""
-    rendered = template
-    for key, value in values.items():
-        rendered = rendered.replace("{" + key + "}", str(value))
-    return rendered
+    return re.sub(
+        r"\{([^{}]+)\}",
+        lambda match: str(values.get(match.group(1), match.group(0))),
+        template,
+    )

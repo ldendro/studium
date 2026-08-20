@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import delete, distinct, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.engine import Connection
 
 from studium.index.repositories._util import inserted_int_pk, mapping
@@ -110,17 +110,24 @@ def list_embeddings_for_search(
 
 
 def list_model_spaces(connection: Connection) -> list[dict[str, Any]]:
-    """Return searchable model spaces, newest indexed revision first."""
+    """Return searchable model spaces, newest embedding generation first."""
     rows = connection.execute(
         select(
-            distinct(embeddings.c.model_id).label("model_id"),
+            embeddings.c.model_id,
             embeddings.c.model_revision,
             embeddings.c.dimension,
             embeddings.c.normalizes_embeddings,
-            embeddings.c.indexed_revision,
+            func.max(embeddings.c.created_at).label("created_at"),
+            func.max(embeddings.c.indexed_revision).label("indexed_revision"),
         )
         .where(embeddings.c.dimension > 0)
-        .order_by(embeddings.c.indexed_revision.desc(), embeddings.c.model_id)
+        .group_by(
+            embeddings.c.model_id,
+            embeddings.c.model_revision,
+            embeddings.c.dimension,
+            embeddings.c.normalizes_embeddings,
+        )
+        .order_by(func.max(embeddings.c.created_at).desc(), embeddings.c.model_id)
     ).all()
     return [mapping(row) for row in rows]
 

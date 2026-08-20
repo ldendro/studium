@@ -43,9 +43,11 @@ def load_sqlite_vec(connection: Connection) -> None:
         msg = "SQLite connection does not support loading extensions"
         raise RuntimeError(msg)
     enable(True)
-    # sqlite-vec's load() expects a stdlib sqlite3.Connection.
-    cast(Any, sqlite_vec).load(raw)
-    enable(False)
+    try:
+        # sqlite-vec's load() expects a stdlib sqlite3.Connection.
+        cast(Any, sqlite_vec).load(raw)
+    finally:
+        enable(False)
 
 
 class SqliteVecSearchBackend:
