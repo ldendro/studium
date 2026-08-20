@@ -22,9 +22,14 @@ from studium.llm.reasoning.orchestrate import (
     parse_identity_decision,
     reason_clarification,
     reason_identity,
+    reason_module_intent,
     reason_new_concept,
 )
-from studium.llm.reasoning.schemas import IdentityClassification
+from studium.llm.reasoning.schemas import (
+    IdentityClassification,
+    ModuleIntentClassification,
+    ScaffoldModuleIntentDecision,
+)
 from studium.recommend.models import (
     AddLearningEncounterRecommendation,
     AddScaffoldModuleRecommendation,
@@ -283,13 +288,31 @@ def recommend(
         identity = reason_identity(provider, search)
         decision = parse_identity_decision(identity)
         if decision is None:
-            return assemble_recommendation_failure(
-                query=query_text,
-                index_revision=revision,
-                stage=FailureStage.STRUCTURED_OUTPUT_VALIDATION,
-                error_code=identity.error_code or "identity_failed",
-                message=identity.message or "Identity reasoning failed",
+            fallback = recommend(
+                engine,
                 search=search,
+                provider=None,
+                source_type=source_type,
+                source_title=source_title,
+                unit=unit,
+                module_intent=module_intent,
+            )
+            if isinstance(fallback, RecommendationFailure):
+                return fallback
+            return fallback.model_copy(
+                update={
+                    "warnings": [
+                        *fallback.warnings,
+                        "Identity reasoning failed "
+                        f"({identity.error_code or 'identity_failed'}); "
+                        "used deterministic fallback: "
+                        f"{identity.message or 'no valid structured decision'}",
+                    ],
+                    "evidence": [
+                        *fallback.evidence,
+                        f"identity_reasoning_failed:{identity.error_code or 'identity_failed'}",
+                    ],
+                }
             )
         if (
             decision.classification == IdentityClassification.SAME_CONCEPT
@@ -333,6 +356,74 @@ def recommend(
                 evidence=[*list(decision.evidence), decision.rationale],
                 target_concept_id=decision.selected_concept_id,
                 match_classification=decision.classification.value,
+            )
+
+        if module_intent:
+            module_result = reason_module_intent(provider, search)
+            module_decision = (
+                ScaffoldModuleIntentDecision.model_validate(module_result.data)
+                if module_result.ok and module_result.data is not None
+                else None
+            )
+            candidate_ids = {candidate.concept_id for candidate in search.ranked_concepts}
+            module_target_id = (
+                None if module_decision is None else module_decision.target_concept_id
+            )
+            if (
+                module_decision is not None
+                and module_decision.classification == ModuleIntentClassification.ADD_TO_EXISTING
+                and module_target_id is not None
+                and module_target_id in candidate_ids
+                and _concept_exists(engine, module_target_id)
+            ):
+                return AddScaffoldModuleRecommendation(
+                    confidence=ConfidenceLevel(module_decision.confidence.value),
+                    completion_status=CompletionStatus.COMPLETE,
+                    reasoning_mode=ReasoningMode.LLM,
+                    index_revision=revision,
+                    evidence=[*module_decision.evidence, module_decision.rationale],
+                    target_concept_id=module_target_id,
+                    module_type=module_decision.suggested_module_type or "derivation",
+                    module_title=module_decision.suggested_title or query_text[:80],
+                    focus=module_decision.suggested_focus,
+                )
+            if (
+                module_decision is not None
+                and module_decision.classification == ModuleIntentClassification.REDUNDANT
+            ):
+                return MarkRedundantRecommendation(
+                    confidence=ConfidenceLevel(module_decision.confidence.value),
+                    completion_status=CompletionStatus.COMPLETE,
+                    reasoning_mode=ReasoningMode.LLM,
+                    index_revision=revision,
+                    evidence=[*module_decision.evidence, module_decision.rationale],
+                    target_concept_id=module_decision.target_concept_id,
+                    reason=module_decision.rationale,
+                )
+            return RequestClarificationRecommendation(
+                confidence=(
+                    ConfidenceLevel(module_decision.confidence.value)
+                    if module_decision is not None
+                    else ConfidenceLevel.LOW
+                ),
+                completion_status=CompletionStatus.COMPLETE,
+                reasoning_mode=(
+                    ReasoningMode.LLM if module_decision is not None else ReasoningMode.FALLBACK
+                ),
+                index_revision=revision,
+                evidence=(
+                    [*module_decision.evidence, module_decision.rationale]
+                    if module_decision is not None
+                    else ["module_intent_reasoning_failed"]
+                ),
+                ambiguity_type="module_parent_target",
+                candidate_interpretations=[
+                    candidate.concept_id for candidate in search.ranked_concepts[:5]
+                ],
+                clarification_message=(
+                    "Choose an existing parent concept or confirm that the module should be "
+                    "created with a new concept."
+                ),
             )
 
         clarification = reason_clarification(provider, search)

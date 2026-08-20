@@ -218,6 +218,37 @@ def test_same_title_with_conflicting_links_is_a_different_source() -> None:
     assert comparison.outcome == EncounterOutcome.DIFFERENT_SOURCE
 
 
+def test_same_source_and_unit_with_different_section_is_new_encounter() -> None:
+    existing = normalize_source_identity(
+        source_type="book",
+        source_title="Machine Learning",
+        unit="Chapter 4",
+        section="Gradient Descent",
+    )
+    candidate = normalize_source_identity(
+        source_type="book",
+        source_title="Machine Learning",
+        unit="Chapter 4",
+        section="Normal Equation",
+    )
+    row = {
+        "id": 1,
+        "concept_id": "concept_linear_models",
+        "source_type": existing.source_type,
+        "source_title": existing.source_title,
+        "unit": existing.unit,
+        "unit_type": None,
+        "section": existing.section,
+        "link": None,
+        "external_id_type": None,
+        "external_id_value": None,
+    }
+
+    comparison = compare_against_rows([row], candidate=candidate)
+
+    assert comparison.outcome == EncounterOutcome.SAME_SOURCE_NEW_UNIT
+
+
 def test_external_identifier_values_preserve_case() -> None:
     upper = normalize_source_identity(
         source_type="video",

@@ -16,6 +16,15 @@ from studium.llm import DeterministicLLMProvider
 from tests.index.sync.helpers import write_concept_note
 
 
+def test_payload_exit_code_fails_for_embedding_errors() -> None:
+    assert (
+        graph._payload_exit_code(  # pyright: ignore[reportPrivateUsage]
+            {"sync": {"status": "success"}, "embeddings": {"failed": 1}}
+        )
+        == 1
+    )
+
+
 def test_graph_status_and_sync(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     app = tmp_path / "app"

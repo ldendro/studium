@@ -261,6 +261,8 @@ def _same_source_by_fallback(existing: SourceIdentity, candidate: SourceIdentity
 def _unit_differs(existing: SourceIdentity, candidate: SourceIdentity) -> bool:
     if existing.unit and candidate.unit and existing.unit != candidate.unit:
         return True
+    if existing.section and candidate.section and existing.section != candidate.section:
+        return True
     return bool(
         existing.unit_type and candidate.unit_type and existing.unit_type != candidate.unit_type
     )

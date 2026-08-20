@@ -7,17 +7,21 @@ from sqlalchemy.engine import Engine
 from studium.index import begin_connection
 from studium.index.repositories import concepts
 from studium.index.search.models import (
+    ChannelContribution,
     ConceptSearchQuery,
     ConceptSearchResult,
     ExactMatchType,
     IdentityMatch,
     RankedConceptCandidate,
     ResolutionState,
+    SearchChannel,
     SearchStatus,
 )
+from studium.llm import DeterministicLLMProvider
 from studium.recommend import recommend
 from studium.recommend.models import (
     AddLearningEncounterRecommendation,
+    AddScaffoldModuleRecommendation,
     CreateNewConceptRecommendation,
     RequestClarificationRecommendation,
     UseExistingConceptRecommendation,
@@ -155,6 +159,85 @@ def test_no_results_create_new_fallback(initialized_engine: Engine) -> None:
     result = recommend(initialized_engine, search=search)
     assert isinstance(result, CreateNewConceptRecommendation)
     assert result.suggested_title == "Brand New Idea"
+
+
+def test_identity_reasoning_failure_uses_deterministic_fallback(
+    initialized_engine: Engine,
+) -> None:
+    _upsert(initialized_engine, "concept_x", "Existing Concept")
+    search = ConceptSearchResult(
+        query=ConceptSearchQuery(text="Existing related topic"),
+        index_revision=1,
+        search_status=SearchStatus.COMPLETE,
+        resolution_state=ResolutionState.RELATED_RESULTS,
+        ranked_concepts=[
+            RankedConceptCandidate(
+                concept_id="concept_x",
+                canonical_title="Existing Concept",
+                fused_rank=1,
+                fused_score=0.1,
+                channels=[ChannelContribution(channel=SearchChannel.FTS, rank=1, score=1.0)],
+            )
+        ],
+    )
+
+    result = recommend(
+        initialized_engine,
+        search=search,
+        provider=DeterministicLLMProvider(default_response={}),
+    )
+
+    assert isinstance(result, UseExistingConceptRecommendation)
+    assert result.completion_status.value == "fallback"
+    assert any("Identity reasoning failed" in warning for warning in result.warnings)
+
+
+def test_module_intent_uses_module_reasoning(initialized_engine: Engine) -> None:
+    _upsert(initialized_engine, "concept_x", "Existing Concept")
+    search = ConceptSearchResult(
+        query=ConceptSearchQuery(text="Add a derivation module"),
+        index_revision=1,
+        search_status=SearchStatus.COMPLETE,
+        resolution_state=ResolutionState.RELATED_RESULTS,
+        ranked_concepts=[
+            RankedConceptCandidate(
+                concept_id="concept_x",
+                canonical_title="Existing Concept",
+                fused_rank=1,
+                fused_score=0.1,
+            )
+        ],
+    )
+
+    def handler(system_prompt: str, _user_prompt: str) -> dict[str, object]:
+        if "whether a query refers" in system_prompt:
+            return {
+                "classification": "distinct_related_concept",
+                "selected_concept_id": None,
+                "confidence": "medium",
+                "rationale": "Related but distinct.",
+                "evidence": [],
+            }
+        return {
+            "classification": "add_to_existing",
+            "target_concept_id": "concept_x",
+            "suggested_module_type": "derivation",
+            "suggested_title": "Derivation",
+            "suggested_focus": "Step-by-step derivation",
+            "confidence": "high",
+            "rationale": "The request targets the existing concept.",
+            "evidence": ["module_intent"],
+        }
+
+    result = recommend(
+        initialized_engine,
+        search=search,
+        provider=DeterministicLLMProvider(handler=handler),
+        module_intent=True,
+    )
+
+    assert isinstance(result, AddScaffoldModuleRecommendation)
+    assert result.target_concept_id == "concept_x"
 
 
 def test_recommend_does_not_mutate_notes(initialized_engine: Engine) -> None:

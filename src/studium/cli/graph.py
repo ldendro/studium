@@ -149,6 +149,12 @@ def _payload_exit_code(payload: Any) -> int:
             sync_data = cast(dict[str, Any], sync_data)
             if sync_data.get("status") == "failed":
                 return 1
+        embedding_data = data.get("embeddings")
+        if isinstance(embedding_data, dict):
+            embedding_data = cast(dict[str, Any], embedding_data)
+            failed = embedding_data.get("failed", 0)
+            if isinstance(failed, int) and not isinstance(failed, bool) and failed > 0:
+                return 1
         if data.get("thresholds_met") is False:
             return 1
         if "failure_stage" in data and "error_code" in data:
