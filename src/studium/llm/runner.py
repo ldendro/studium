@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import json
-import re
+from collections.abc import Iterator
 from typing import Any, cast
 
 from pydantic import ValidationError
 
 from studium.llm.protocol import LLMProvider, StructuredGenerationResult
 from studium.llm.tasks import TaskDefinition, render_user_prompt
-
-_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
 def extract_json_object(text: str) -> dict[str, Any]:
@@ -30,15 +28,44 @@ def extract_json_object(text: str) -> dict[str, Any]:
             return cast(dict[str, Any], loaded)
     except json.JSONDecodeError:
         pass
-    match = _JSON_OBJECT_RE.search(text)
-    if match is None:
-        msg = "No JSON object found in model output"
-        raise ValueError(msg)
-    loaded = json.loads(match.group(0))
-    if not isinstance(loaded, dict):
-        msg = "JSON payload is not an object"
-        raise ValueError(msg)
-    return cast(dict[str, Any], loaded)
+    for candidate in _balanced_json_objects(text):
+        try:
+            loaded = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(loaded, dict):
+            return cast(dict[str, Any], loaded)
+    msg = "No valid JSON object found in model output"
+    raise ValueError(msg)
+
+
+def _balanced_json_objects(text: str) -> Iterator[str]:
+    """Yield balanced brace-delimited candidates, ignoring braces inside strings."""
+    for start, character in enumerate(text):
+        if character != "{":
+            continue
+        depth = 0
+        in_string = False
+        escaped = False
+        for index in range(start, len(text)):
+            current = text[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif current == "\\":
+                    escaped = True
+                elif current == '"':
+                    in_string = False
+                continue
+            if current == '"':
+                in_string = True
+            elif current == "{":
+                depth += 1
+            elif current == "}":
+                depth -= 1
+                if depth == 0:
+                    yield text[start : index + 1]
+                    break
 
 
 def run_reasoning_task(

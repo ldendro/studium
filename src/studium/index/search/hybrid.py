@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 from sqlalchemy.engine import Engine
 
@@ -39,6 +40,12 @@ from studium.index.vector.facade import (
 )
 from studium.index.vector.models import ModelSpaceFilter, VectorConceptHit, VectorModuleHit
 from studium.index.vector.protocol import VectorSearchBackend
+
+_FILTER_OVERFETCH_FACTOR = 8
+
+
+class _ConceptOwnedHit(Protocol):
+    concept_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,7 +117,11 @@ def search_concepts(
                 search_status=SearchStatus.COMPLETE,
                 resolution_state=ResolutionState.EXACT_MATCH,
                 exact_matches=[match],
-                ranked_concepts=[candidate] if candidate is not None else [],
+                ranked_concepts=(
+                    [candidate]
+                    if candidate is not None and search_query.limits.concepts > 0
+                    else []
+                ),
                 module_hits=[],
                 evidence=evidence,
                 warnings=warnings,
@@ -157,19 +168,30 @@ def _tier1_hybrid(
     diagnostics["path"] = "tier1"
     limits = search_query.limits
     channel_limit = limits.channel
-    channel_query_limit = (
-        2_147_483_647 if channel_limit > 0 and _has_filters(search_query) else channel_limit
-    )
+    capped_channels: list[str] = []
     weights = dict(options.rrf_weights or DEFAULT_RRF_WEIGHTS)
     status = SearchStatus.COMPLETE
     channel_errors: list[str] = []
 
-    fts_concepts = search_concepts_fts(engine, search_query.text, limit=channel_query_limit)
-    fts_modules = (
-        search_modules_fts(engine, search_query.text, limit=channel_query_limit)
-        if search_query.include_modules
-        else []
+    fts_concepts, capped = _bounded_filtered_channel(
+        engine,
+        search_query,
+        channel_limit=channel_limit,
+        fetch=lambda limit: search_concepts_fts(engine, search_query.text, limit=limit),
     )
+    if capped:
+        capped_channels.append("fts_concepts")
+    if search_query.include_modules:
+        fts_modules, capped = _bounded_filtered_channel(
+            engine,
+            search_query,
+            channel_limit=channel_limit,
+            fetch=lambda limit: search_modules_fts(engine, search_query.text, limit=limit),
+        )
+        if capped:
+            capped_channels.append("fts_modules")
+    else:
+        fts_modules = []
 
     identity_hits: list[VectorConceptHit] = []
     semantic_hits: list[VectorConceptHit] = []
@@ -198,42 +220,63 @@ def _tier1_hybrid(
         assert semantic_vec is not None
         with ThreadPoolExecutor(max_workers=3) as pool:
             fut_id = pool.submit(
-                search_concept_identity_vectors,
+                _bounded_filtered_channel,
                 engine,
-                identity_vec,
-                model_filter,
-                limit=channel_query_limit,
-                backend=options.vector_backend,
+                search_query,
+                channel_limit=channel_limit,
+                fetch=lambda limit: search_concept_identity_vectors(
+                    engine,
+                    identity_vec,
+                    model_filter,
+                    limit=limit,
+                    backend=options.vector_backend,
+                ),
             )
             fut_sem = pool.submit(
-                search_concept_semantic_vectors,
+                _bounded_filtered_channel,
                 engine,
-                semantic_vec,
-                model_filter,
-                limit=channel_query_limit,
-                backend=options.vector_backend,
+                search_query,
+                channel_limit=channel_limit,
+                fetch=lambda limit: search_concept_semantic_vectors(
+                    engine,
+                    semantic_vec,
+                    model_filter,
+                    limit=limit,
+                    backend=options.vector_backend,
+                ),
             )
             fut_mod = None
             if search_query.include_modules:
                 fut_mod = pool.submit(
-                    search_module_semantic_vectors,
+                    _bounded_filtered_channel,
                     engine,
-                    semantic_vec,
-                    model_filter,
-                    limit=channel_query_limit,
-                    backend=options.vector_backend,
+                    search_query,
+                    channel_limit=channel_limit,
+                    fetch=lambda limit: search_module_semantic_vectors(
+                        engine,
+                        semantic_vec,
+                        model_filter,
+                        limit=limit,
+                        backend=options.vector_backend,
+                    ),
                 )
             try:
-                identity_hits = fut_id.result()
+                identity_hits, capped = fut_id.result()
+                if capped:
+                    capped_channels.append("identity_vector")
             except Exception as exc:
                 channel_errors.append(f"identity_vector_failed: {exc}")
             try:
-                semantic_hits = fut_sem.result()
+                semantic_hits, capped = fut_sem.result()
+                if capped:
+                    capped_channels.append("semantic_vector")
             except Exception as exc:
                 channel_errors.append(f"semantic_vector_failed: {exc}")
             if fut_mod is not None:
                 try:
-                    module_vector_hits = fut_mod.result()
+                    module_vector_hits, capped = fut_mod.result()
+                    if capped:
+                        capped_channels.append("module_vector")
                 except Exception as exc:
                     channel_errors.append(f"module_vector_failed: {exc}")
         if channel_errors:
@@ -245,6 +288,12 @@ def _tier1_hybrid(
 
     if channel_errors:
         diagnostics["channel_errors"] = channel_errors
+    if capped_channels:
+        warnings.append(
+            "One or more filtered channels reached the bounded over-fetch cap; "
+            "results may be incomplete."
+        )
+        diagnostics["filter_overfetch_capped"] = sorted(capped_channels)
 
     # Concept-level ranks (lexical and vector module hits contribute parent ids).
     lexical_concept_ranks = ranks_from_ordered_ids([hit.concept_id for hit in fts_concepts])
@@ -588,6 +637,54 @@ def _has_filters(query: ConceptSearchQuery) -> bool:
         or filters.vault_statuses
         or filters.review_statuses
     )
+
+
+def _bounded_filtered_channel[HitT: _ConceptOwnedHit](
+    engine: Engine,
+    query: ConceptSearchQuery,
+    *,
+    channel_limit: int,
+    fetch: Callable[[int], list[HitT]],
+) -> tuple[list[HitT], bool]:
+    """Incrementally over-fetch a filtered channel within a fixed memory bound."""
+    if channel_limit <= 0:
+        return [], False
+    if not _has_filters(query):
+        return fetch(channel_limit), False
+
+    request_limit = channel_limit
+    max_limit = channel_limit * _FILTER_OVERFETCH_FACTOR
+    filter_cache: dict[str, bool] = {}
+    while True:
+        hits = fetch(request_limit)
+        filtered: list[HitT] = []
+        for hit in hits:
+            concept_id = hit.concept_id
+            if concept_id not in filter_cache:
+                candidate = _enrich_concept(
+                    engine,
+                    concept_id,
+                    fused_rank=0,
+                    fused_score=0.0,
+                    channels=[],
+                    matched_fields=[],
+                    overview_excerpt=None,
+                    matching_modules=[],
+                )
+                filter_cache[concept_id] = bool(
+                    candidate is not None and _passes_filters(candidate, query)
+                )
+            if filter_cache[concept_id]:
+                filtered.append(hit)
+                if len(filtered) >= channel_limit:
+                    return filtered, False
+
+        exhausted = len(hits) < request_limit
+        if exhausted:
+            return filtered, False
+        if request_limit >= max_limit:
+            return filtered, True
+        request_limit = min(max_limit, request_limit * 2)
 
 
 def _load_ranked_exact(engine: Engine, match: IdentityMatch) -> RankedConceptCandidate | None:

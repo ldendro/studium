@@ -24,6 +24,7 @@ from studium.index import (
 )
 from studium.index.repositories import concepts
 from studium.index.repositories import embeddings as embeddings_repo
+from studium.index.search.models import ConceptSearchLimits
 from studium.index.search.rrf import fuse_ranked_lists, reciprocal_rank_score
 from studium.vault import Vault
 from tests.index.sync.helpers import write_concept_note
@@ -81,6 +82,21 @@ def test_tier0_exact_match(initialized_engine: Engine) -> None:
     assert result.exact_matches[0].concept_id == "concept_exact_aaaaaa"
     assert result.ranked_concepts[0].concept_id == "concept_exact_aaaaaa"
     assert result.diagnostics == {}
+
+
+def test_tier0_exact_match_honors_zero_concept_limit(initialized_engine: Engine) -> None:
+    _upsert_concept(initialized_engine, "concept_exact_zero", "Exact Zero")
+    result = search_concepts(
+        initialized_engine,
+        ConceptSearchQuery(
+            text="Exact Zero",
+            limits=ConceptSearchLimits(concepts=0),
+        ),
+    )
+
+    assert result.resolution_state == ResolutionState.EXACT_MATCH
+    assert result.exact_matches[0].concept_id == "concept_exact_zero"
+    assert result.ranked_concepts == []
 
 
 def test_tier1_fts_only_partial(
@@ -215,6 +231,40 @@ def test_filter_by_concept_type(initialized_engine: Engine) -> None:
         ),
     )
     assert all(c.concept_type == "atomic_concept" for c in result.ranked_concepts)
+
+
+def test_filtered_channels_incrementally_overfetch_with_a_fixed_cap(
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    for index in range(1, 10):
+        write_concept_note(
+            vault_root,
+            f"concepts/{index}.md",
+            id=f"concept_filter_{index:06d}",
+            canonical_title=f"Filter Candidate {index}",
+            concept_type=("algorithm" if index == 9 else "general_concept"),
+            overview="boundedfilterterm",
+        )
+    from studium.index import sync_vault
+
+    sync_vault(Vault(vault_root), initialized_engine, index_config)
+    result = search_concepts(
+        initialized_engine,
+        ConceptSearchQuery(
+            text="boundedfilterterm",
+            filters=ConceptSearchFilters(concept_types=["algorithm"]),
+            limits=ConceptSearchLimits(channel=2),
+            include_modules=False,
+            include_diagnostics=True,
+        ),
+    )
+
+    assert [candidate.concept_id for candidate in result.ranked_concepts] == [
+        "concept_filter_000009"
+    ]
+    assert "filter_overfetch_capped" not in result.diagnostics
 
 
 def test_empty_query_no_crash(initialized_engine: Engine) -> None:

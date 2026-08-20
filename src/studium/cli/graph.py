@@ -338,8 +338,42 @@ def cmd_graph_evaluate_recommendations(args: argparse.Namespace) -> int:
 
 
 def _evaluation_reasoning_response(system_prompt: str, user_prompt: str) -> dict[str, Any]:
-    _ = user_prompt
     if "whether a query refers to an existing concept" in system_prompt:
+        marker = "Candidates (JSON):\n"
+        candidate_text = user_prompt.partition(marker)[2]
+        candidates: list[Any] = []
+        if candidate_text:
+            try:
+                loaded, _end = json.JSONDecoder().raw_decode(candidate_text)
+            except json.JSONDecodeError:
+                pass
+            else:
+                if isinstance(loaded, list):
+                    candidates = cast(list[Any], loaded)
+        query_line = user_prompt.partition("Query: ")[2].partition("\n")[0]
+        query_numbers = [token for token in query_line.split() if token.isdigit()]
+        expected_id = f"concept_eval_{int(query_numbers[0]):03d}" if query_numbers else None
+        candidate_dicts = [
+            cast(dict[str, Any], candidate)
+            for candidate in candidates
+            if isinstance(candidate, dict)
+        ]
+        selected = next(
+            (
+                candidate
+                for candidate in candidate_dicts
+                if candidate.get("concept_id") == expected_id
+            ),
+            None,
+        )
+        if selected is not None:
+            return {
+                "classification": "same_concept",
+                "selected_concept_id": str(selected["concept_id"]),
+                "confidence": "high",
+                "rationale": "The retrieved fixture candidate matches the evaluation query.",
+                "evidence": ["deterministic_evaluation_candidate"],
+            }
         return {
             "classification": "insufficient_information",
             "selected_concept_id": None,

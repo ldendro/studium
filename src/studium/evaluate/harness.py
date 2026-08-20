@@ -248,7 +248,9 @@ def generate_evaluation_report(
         and case_verdicts_met
     )
     recommendation_met = (
-        structured >= thresholds["structured_validity"]
+        len(recommendations) == len(cases)
+        and {result.case_id for result in recommendations} == {case.case_id for case in cases}
+        and structured >= thresholds["structured_validity"]
         and action_acc >= thresholds["action_accuracy"]
     )
     met = bool(cases) and retrieval_met and (not recommendations or recommendation_met)

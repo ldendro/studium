@@ -70,3 +70,36 @@ def test_empty_case_set_fails_evaluation() -> None:
     )
     assert report.case_count == 0
     assert report.thresholds_met is False
+
+
+def test_incomplete_recommendation_coverage_fails_evaluation() -> None:
+    cases = load_evaluation_cases()[:2]
+    retrieval = [
+        RetrievalCaseResult(
+            case_id=case.case_id,
+            hit=True,
+            reciprocal_rank=1.0,
+            ranked_ids=list(case.required_candidate_ids),
+            resolution_state="exact_match",
+            search_status="complete",
+        )
+        for case in cases
+    ]
+    recommendations = [
+        RecommendationCaseResult(
+            case_id=cases[0].case_id,
+            action="use_existing_concept",
+            action_ok=True,
+            structured_ok=True,
+        )
+    ]
+
+    report = generate_evaluation_report(
+        cases=cases,
+        retrieval=retrieval,
+        recommendations=recommendations,
+    )
+
+    assert report.action_accuracy == 1.0
+    assert report.structured_validity == 1.0
+    assert report.thresholds_met is False

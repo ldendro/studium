@@ -256,3 +256,64 @@ def test_graph_propose_uses_healthy_reasoning_provider(
     )
     payload = json.loads(capsys.readouterr().out)
     assert payload["reasoning_mode"] == "llm"
+
+
+def test_graph_recommendation_evaluation_classifies_retrieved_fixture_candidate(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    vault = tmp_path / "vault"
+    app = tmp_path / "app"
+    cases = tmp_path / "case.yaml"
+    vault.mkdir()
+    app.mkdir()
+    write_concept_note(
+        vault,
+        "concepts/six.md",
+        id="concept_eval_006",
+        canonical_title="Math Sample Topic 6",
+        overview="A sample learning query about math, fixture number 6.",
+    )
+    note_path = vault / "concepts/six.md"
+    note_path.write_text(
+        note_path.read_text(encoding="utf-8").replace(
+            "concept_domains: []", "concept_domains:\n  - math"
+        ),
+        encoding="utf-8",
+    )
+    cases.write_text(
+        """case_id: p2-006
+query: Sample query 6 about math
+domain: math
+acceptable_actions:
+  - use_existing_concept
+required_candidate_ids:
+  - concept_eval_006
+prohibited_identity_ids: []
+expected_resolution_states:
+  - related_results
+""",
+        encoding="utf-8",
+    )
+    assert main(["graph", "sync", "--vault", str(vault), "--app-data", str(app)]) == 0
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "graph",
+                "evaluate-recommendations",
+                "--vault",
+                str(vault),
+                "--app-data",
+                str(app),
+                "--cases",
+                str(cases),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["recommendation_results"][0]["action"] == "use_existing_concept"
+    assert payload["thresholds_met"] is True

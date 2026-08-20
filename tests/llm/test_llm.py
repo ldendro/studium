@@ -25,6 +25,11 @@ def test_extract_json_object_fenced() -> None:
     assert extract_json_object(text)["classification"] == "same_concept"
 
 
+def test_extract_json_object_ignores_later_braces_and_objects() -> None:
+    text = '{"message": "brace } in string", "ok": true} commentary {"example": false}'
+    assert extract_json_object(text) == {"message": "brace } in string", "ok": True}
+
+
 def test_run_reasoning_task_validates_and_repairs() -> None:
     calls = {"n": 0}
 
