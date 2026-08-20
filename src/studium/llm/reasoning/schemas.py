@@ -6,7 +6,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from studium.schemas.enums import LearningRole, RelationshipType
+from studium.schemas.enums import ConceptType, LearningRole, RelationshipType
 
 
 class ConfidenceLevel(StrEnum):
@@ -52,7 +52,7 @@ def _empty_strings() -> list[str]:
 class NewConceptAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    suggested_concept_type: str
+    suggested_concept_type: ConceptType
     suggested_domains: list[str] = Field(default_factory=_empty_strings)
     scope_summary: str
     graph_positions: list[GraphPositionHint] = Field(default_factory=_empty_graph_positions)

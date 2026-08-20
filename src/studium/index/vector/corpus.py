@@ -68,6 +68,8 @@ def load_corpus(
         else:
             continue
         vector = unpack_vector(blob, dimension=int(row["dimension"]))
+        if not np.all(np.isfinite(vector)) or float(np.linalg.norm(vector)) == 0.0:
+            continue
         parent = row.get("parent_concept_id")
         corpus.append(
             CorpusRow(

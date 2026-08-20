@@ -15,7 +15,11 @@ from studium.evaluate.models import (
     RetrievalCaseResult,
 )
 from studium.index.search.hybrid import HybridSearchOptions, search_concepts
-from studium.index.search.models import ConceptSearchQuery, ResolutionState
+from studium.index.search.models import (
+    ConceptSearchFilters,
+    ConceptSearchQuery,
+    ResolutionState,
+)
 from studium.llm.protocol import LLMProvider
 from studium.recommend.models import RecommendationFailure
 from studium.recommend.service import recommend
@@ -83,7 +87,11 @@ def run_retrieval_evaluation(
     for case in cases:
         search = search_concepts(
             engine,
-            ConceptSearchQuery(text=case.query, include_diagnostics=False),
+            ConceptSearchQuery(
+                text=case.query,
+                filters=ConceptSearchFilters(domains=[case.domain]),
+                include_diagnostics=False,
+            ),
             options=options,
         )
         ranked_ids = [c.concept_id for c in search.ranked_concepts]
@@ -127,7 +135,10 @@ def run_recommendation_evaluation(
     for case in cases:
         search = search_concepts(
             engine,
-            ConceptSearchQuery(text=case.query),
+            ConceptSearchQuery(
+                text=case.query,
+                filters=ConceptSearchFilters(domains=[case.domain]),
+            ),
             options=options,
         )
         outcome = recommend(engine, search=search, provider=provider)
@@ -169,7 +180,7 @@ def generate_evaluation_report(
     recommendations: list[RecommendationCaseResult],
     config: dict[str, Any] | None = None,
 ) -> EvaluationReport:
-    n = max(1, len(cases))
+    n = len(cases)
     positive_cases = [case for case in cases if case.required_candidate_ids]
     retrieval_by_case = {result.case_id: result for result in retrieval}
     recall = (
@@ -222,7 +233,7 @@ def generate_evaluation_report(
         structured >= thresholds["structured_validity"]
         and action_acc >= thresholds["action_accuracy"]
     )
-    met = retrieval_met and (not recommendations or recommendation_met)
+    met = bool(cases) and retrieval_met and (not recommendations or recommendation_met)
     return EvaluationReport(
         case_count=n,
         recall_at_5=recall,

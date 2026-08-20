@@ -80,11 +80,11 @@ def get_prerequisites(engine: Engine, concept_id: str) -> list[GraphRelationship
 
 def get_concepts_depending_on(engine: Engine, concept_id: str) -> list[GraphRelationship]:
     """Derived ``prerequisite_for`` views: who depends on ``concept_id``."""
+    neighborhood = get_one_hop_neighborhood(engine, concept_id)
     return [
         rel
-        for rel in _incoming_derived(engine, concept_id)
+        for rel in [*neighborhood.outgoing, *neighborhood.incoming_derived]
         if rel.relationship_type == "prerequisite_for"
-        or rel.original_relationship_type == "depends_on"
     ]
 
 

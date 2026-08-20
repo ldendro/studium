@@ -105,7 +105,26 @@ def recommend(
     query_text = search.query.text
     revision = search.index_revision
 
-    exact_match = search.exact_matches[0] if search.exact_matches else None
+    has_source_intent = bool(source_type or source_title or unit)
+    if has_source_intent and not (source_type and source_title):
+        return RequestClarificationRecommendation(
+            confidence=ConfidenceLevel.LOW,
+            completion_status=CompletionStatus.COMPLETE,
+            reasoning_mode=ReasoningMode.DETERMINISTIC,
+            index_revision=revision,
+            evidence=["incomplete_source_intent"],
+            ambiguity_type="incomplete_source_intent",
+            candidate_interpretations=[],
+            clarification_message=(
+                "Learning encounter intent requires both source_type and source_title."
+            ),
+        )
+
+    exact_match = (
+        search.exact_matches[0]
+        if search.resolution_state == ResolutionState.EXACT_MATCH and len(search.exact_matches) == 1
+        else None
+    )
     intent_target_id = exact_match.concept_id if exact_match is not None else None
 
     # Explicit source intent takes precedence over generic exact reuse.

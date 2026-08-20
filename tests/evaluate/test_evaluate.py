@@ -53,7 +53,7 @@ def test_report_markdown() -> None:
     assert "exact_lookup_accuracy" in APPROVED_THRESHOLDS
 
 
-def test_retrieval_only_report_ignores_absent_recommendation_metrics() -> None:
+def test_empty_case_set_fails_evaluation() -> None:
     report = generate_evaluation_report(
         cases=[],
         retrieval=[
@@ -68,4 +68,5 @@ def test_retrieval_only_report_ignores_absent_recommendation_metrics() -> None:
         ],
         recommendations=[],
     )
-    assert report.thresholds_met is True
+    assert report.case_count == 0
+    assert report.thresholds_met is False
