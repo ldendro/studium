@@ -139,9 +139,9 @@ class ConceptSearchFilters(BaseModel):
 class ConceptSearchLimits(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    concepts: int = 20
-    modules: int = 20
-    channel: int = 50
+    concepts: int = Field(default=20, ge=0)
+    modules: int = Field(default=20, ge=0)
+    channel: int = Field(default=50, ge=0)
 
 
 class ConceptSearchQuery(BaseModel):

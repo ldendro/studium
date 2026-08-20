@@ -53,6 +53,10 @@ def load_evaluation_cases(path: Path | None = None) -> list[EvaluationCase]:
                 cases.append(EvaluationCase.model_validate(item))
         else:
             cases.append(EvaluationCase.model_validate(payload))
+    case_ids = [case.case_id for case in cases]
+    duplicates = sorted({case_id for case_id in case_ids if case_ids.count(case_id) > 1})
+    if duplicates:
+        raise ValueError(f"Duplicate evaluation case IDs: {', '.join(duplicates)}")
     return cases
 
 
@@ -235,8 +239,13 @@ def generate_evaluation_report(
         else 0.0
     )
     thresholds = dict(APPROVED_THRESHOLDS)
-    retrieval_met = exact_acc >= thresholds["exact_lookup_accuracy"] and (
-        not positive_cases or recall >= thresholds["recall_at_5"]
+    case_verdicts_met = len(retrieval_by_case) == len(cases) and all(
+        retrieval_by_case[case.case_id].hit for case in cases
+    )
+    retrieval_met = (
+        exact_acc >= thresholds["exact_lookup_accuracy"]
+        and (not positive_cases or recall >= thresholds["recall_at_5"])
+        and case_verdicts_met
     )
     recommendation_met = (
         structured >= thresholds["structured_validity"]

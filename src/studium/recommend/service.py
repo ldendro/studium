@@ -349,6 +349,23 @@ def recommend(
             graph_positions=graph_positions,
         )
 
+    if module_intent:
+        return RequestClarificationRecommendation(
+            confidence=ConfidenceLevel.LOW,
+            completion_status=CompletionStatus.COMPLETE,
+            reasoning_mode=ReasoningMode.DETERMINISTIC,
+            index_revision=revision,
+            evidence=["module_intent_without_unique_target"],
+            ambiguity_type="module_parent_target",
+            candidate_interpretations=[
+                candidate.concept_id for candidate in search.ranked_concepts[:5]
+            ],
+            clarification_message=(
+                "Choose an existing parent concept or confirm that the module should be "
+                "created with a new concept."
+            ),
+        )
+
     # No provider: deterministic fallbacks from search state
     if search.resolution_state == ResolutionState.NO_RESULTS:
         return _fallback_create_new(search, query_text, revision)

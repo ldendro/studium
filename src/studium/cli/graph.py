@@ -83,6 +83,7 @@ def _search_options(engine: Any) -> HybridSearchOptions:
 
 
 def _emit(payload: Any, *, as_json: bool, diagnostics: dict[str, Any] | None = None) -> int:
+    exit_code = _payload_exit_code(payload)
     data: Any
     if as_json:
         if isinstance(payload, dict):
@@ -94,7 +95,7 @@ def _emit(payload: Any, *, as_json: bool, diagnostics: dict[str, Any] | None = N
         if diagnostics is not None:
             data = {"result": data, "diagnostics": diagnostics}
         print(json.dumps(data, indent=2, default=str))
-        return 0
+        return exit_code
     if hasattr(payload, "model_dump"):
         dumped = payload.model_dump(mode="json")
         print(json.dumps(dumped, indent=2, default=str))
@@ -103,6 +104,17 @@ def _emit(payload: Any, *, as_json: bool, diagnostics: dict[str, Any] | None = N
     if diagnostics:
         print("--- diagnostics ---")
         print(json.dumps(diagnostics, indent=2, default=str))
+    return exit_code
+
+
+def _payload_exit_code(payload: Any) -> int:
+    data = payload.model_dump(mode="json") if hasattr(payload, "model_dump") else payload
+    if isinstance(data, dict):
+        data = cast(dict[str, Any], data)
+        if data.get("status") == "failed":
+            return 1
+        if "failure_stage" in data and "error_code" in data:
+            return 1
     return 0
 
 
@@ -131,7 +143,7 @@ def cmd_graph_rebuild(args: argparse.Namespace) -> int:
 def cmd_graph_status(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
-    payload = {
+    payload: dict[str, Any] = {
         "vault": str(config.resolved_vault_root),
         "database": str(config.database_path),
         "index_revision": get_index_revision(engine),
@@ -156,12 +168,18 @@ def cmd_graph_find(args: argparse.Namespace) -> int:
 def cmd_graph_candidates(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
-    result = search_concepts(engine, args.query, options=_search_options(engine))
-    payload = {
+    result = search_concepts(
+        engine,
+        ConceptSearchQuery(text=args.query, include_diagnostics=args.diagnostics),
+        options=_search_options(engine),
+    )
+    payload: dict[str, Any] = {
         "ranked_concepts": [c.model_dump(mode="json") for c in result.ranked_concepts],
         "module_hits": [m.model_dump(mode="json") for m in result.module_hits],
         "resolution_state": result.resolution_state.value,
     }
+    if args.diagnostics:
+        payload["diagnostics"] = result.diagnostics
     return _emit(payload, as_json=True)
 
 

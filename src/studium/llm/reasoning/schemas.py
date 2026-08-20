@@ -6,6 +6,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from studium.schemas.concept_note import ConceptDomain
 from studium.schemas.enums import ConceptType, LearningRole, RelationshipType
 
 
@@ -61,7 +62,7 @@ class NewConceptAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     suggested_concept_type: ConceptType
-    suggested_domains: list[str] = Field(default_factory=_empty_strings)
+    suggested_domains: list[ConceptDomain] = Field(default_factory=_empty_strings)
     scope_summary: str
     graph_positions: list[GraphPositionHint] = Field(default_factory=_empty_graph_positions)
     prerequisite_titles: list[str] = Field(default_factory=_empty_strings)
