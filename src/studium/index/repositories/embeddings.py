@@ -77,6 +77,7 @@ def list_module_embeddings_for_parent(
 def list_embeddings_for_search(
     connection: Connection,
     *,
+    owner_type: str,
     embedding_type: str,
     model_id: str,
     dimension: int,
@@ -91,6 +92,7 @@ def list_embeddings_for_search(
     if dimension <= 0:
         return []
     conditions = [
+        embeddings.c.owner_type == owner_type,
         embeddings.c.embedding_type == embedding_type,
         embeddings.c.model_id == model_id,
         embeddings.c.dimension == dimension,

@@ -52,6 +52,7 @@ def load_corpus(
 ) -> list[CorpusRow]:
     rows = embeddings_repo.list_embeddings_for_search(
         connection,
+        owner_type=("scaffold_module" if embedding_type == "module_semantic" else "concept"),
         embedding_type=embedding_type,
         model_id=model_filter.model_id,
         dimension=model_filter.dimension,

@@ -156,7 +156,7 @@ def _tier1_hybrid(
 ) -> ConceptSearchResult:
     diagnostics["path"] = "tier1"
     limits = search_query.limits
-    channel_limit = max(limits.channel, limits.concepts, limits.modules)
+    channel_limit = limits.channel
     weights = dict(options.rrf_weights or DEFAULT_RRF_WEIGHTS)
     status = SearchStatus.COMPLETE
     channel_errors: list[str] = []

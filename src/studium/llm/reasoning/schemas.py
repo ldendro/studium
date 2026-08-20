@@ -94,8 +94,8 @@ class ScaffoldModuleIntentDecision(BaseModel):
 class RelationshipJudgment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    relationship_type: str
-    learning_role: str
+    relationship_type: RelationshipType
+    learning_role: LearningRole
     target_concept_id: str | None = None
     target_title: str
     confidence: ConfidenceLevel

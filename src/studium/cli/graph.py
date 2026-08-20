@@ -24,6 +24,7 @@ from studium.index import (
     initialize_index,
     rebuild_vault_index,
     search_concepts,
+    sync_and_embed,
     sync_vault,
 )
 from studium.index.errors import IndexNotInitializedError, IndexSchemaMismatchError
@@ -113,6 +114,11 @@ def _payload_exit_code(payload: Any) -> int:
         data = cast(dict[str, Any], data)
         if data.get("status") == "failed":
             return 1
+        sync_data = data.get("sync")
+        if isinstance(sync_data, dict):
+            sync_data = cast(dict[str, Any], sync_data)
+            if sync_data.get("status") == "failed":
+                return 1
         if "failure_stage" in data and "error_code" in data:
             return 1
     return 0
@@ -121,9 +127,20 @@ def _payload_exit_code(payload: Any) -> int:
 def cmd_graph_sync(args: argparse.Namespace) -> int:
     config = _config_from_args(args)
     engine = _engine(config)
-    report = sync_vault(Vault(config.resolved_vault_root), engine, config)
+    vault = Vault(config.resolved_vault_root)
+    try:
+        provider = SentenceTransformersEmbeddingProvider()
+    except ImportError:
+        report = sync_vault(vault, engine, config)
+        payload: Any = report
+    else:
+        combined = sync_and_embed(vault, engine, config, provider)
+        payload = {
+            "sync": combined.sync.model_dump(mode="json"),
+            "embeddings": combined.embeddings.model_dump(mode="json"),
+        }
     return _emit(
-        report,
+        payload,
         as_json=args.json,
         diagnostics={"index_revision": get_index_revision(engine)} if args.diagnostics else None,
     )

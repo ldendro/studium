@@ -71,6 +71,13 @@ def build_source_fingerprint(identity: SourceIdentity) -> str:
             "type": identity.external_id_type,
             "value": identity.external_id_value,
         }
+    elif identity.link:
+        payload = {
+            "kind": "link",
+            "source_type": identity.source_type,
+            "source_title": identity.source_title,
+            "link": identity.link,
+        }
     else:
         payload = {
             "kind": "title",
