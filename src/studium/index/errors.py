@@ -7,6 +7,14 @@ class ConceptIndexError(Exception):
     """Base error for index operations."""
 
 
+class ConceptNotFoundError(ConceptIndexError):
+    """Raised when a requested concept does not exist in the derived index."""
+
+    def __init__(self, concept_id: str) -> None:
+        self.concept_id = concept_id
+        super().__init__(f"Concept not found in index: {concept_id}")
+
+
 class IndexNotInitializedError(ConceptIndexError):
     """Raised when the index database has not been initialized."""
 

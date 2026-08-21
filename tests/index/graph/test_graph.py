@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy.engine import Engine
 
 from studium.index import begin_connection
+from studium.index.errors import ConceptNotFoundError
 from studium.index.graph import (
     EncounterOutcome,
     build_encounter_fingerprint,
@@ -73,6 +74,11 @@ def test_one_hop_and_prerequisites(initialized_engine: Engine) -> None:
     assert neighborhood.incoming_derived[0].relationship_type == "prerequisite_for"
     assert neighborhood.incoming_derived[0].target_id == "concept_backprop"
     assert neighborhood.incoming_derived[0].target_title == "Backpropagation"
+
+
+def test_one_hop_rejects_missing_concept(initialized_engine: Engine) -> None:
+    with pytest.raises(ConceptNotFoundError, match="missing-concept"):
+        get_one_hop_neighborhood(initialized_engine, "missing-concept")
 
 
 def test_parent_child_buckets_follow_graph_direction(initialized_engine: Engine) -> None:

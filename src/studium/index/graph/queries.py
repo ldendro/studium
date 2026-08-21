@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy.engine import Engine
 
+from studium.index.errors import ConceptNotFoundError
 from studium.index.graph.inverses import (
     CHILD_TYPES,
     PARENT_TYPES,
@@ -114,6 +115,9 @@ def get_parent_child_candidates(
 
 
 def get_one_hop_neighborhood(engine: Engine, concept_id: str) -> OneHopNeighborhood:
+    with engine.connect() as connection:
+        if concepts_repo.get_concept(connection, concept_id) is None:
+            raise ConceptNotFoundError(concept_id)
     outgoing = get_direct_relationships(engine, concept_id)
     incoming = _incoming_derived(engine, concept_id)
     by_type: dict[str, list[GraphRelationship]] = {}

@@ -33,6 +33,7 @@ from studium.index.embeddings import (
 from studium.index.engine import begin_connection, create_index_engine, read_pragma
 from studium.index.errors import (
     ConceptIndexError,
+    ConceptNotFoundError,
     IndexIntegrityError,
     IndexNotInitializedError,
     IndexSchemaMismatchError,
@@ -94,6 +95,7 @@ __all__ = [
     "INDEX_SCHEMA_VERSION",
     "MAX_MODULE_EMBED_CHARS",
     "ConceptIndexError",
+    "ConceptNotFoundError",
     "ConceptSearchFilters",
     "ConceptSearchQuery",
     "ConceptSearchResult",

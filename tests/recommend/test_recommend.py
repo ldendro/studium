@@ -307,6 +307,50 @@ def test_module_intent_uses_module_reasoning(initialized_engine: Engine) -> None
     assert result.target_concept_id == "concept_x"
 
 
+def test_module_intent_preserves_create_with_concept_decision(
+    initialized_engine: Engine,
+) -> None:
+    search = ConceptSearchResult(
+        query=ConceptSearchQuery(text="Explain a new optimization idea with an example"),
+        index_revision=1,
+        search_status=SearchStatus.COMPLETE,
+        resolution_state=ResolutionState.NO_RESULTS,
+    )
+
+    def handler(system_prompt: str, _user_prompt: str) -> dict[str, object]:
+        if "whether a query refers" in system_prompt:
+            return {
+                "classification": "distinct_related_concept",
+                "selected_concept_id": None,
+                "confidence": "medium",
+                "rationale": "This is a new concept.",
+                "evidence": [],
+            }
+        return {
+            "classification": "create_with_concept",
+            "target_concept_id": None,
+            "suggested_module_type": "worked_example",
+            "suggested_title": "Optimization walkthrough",
+            "suggested_focus": "A numerical example",
+            "confidence": "high",
+            "rationale": "The example belongs with the new concept.",
+            "evidence": ["new concept and module requested"],
+        }
+
+    result = recommend(
+        initialized_engine,
+        search=search,
+        provider=DeterministicLLMProvider(handler=handler),
+        module_intent=True,
+    )
+
+    assert isinstance(result, CreateNewConceptRecommendation)
+    assert result.completion_status.value == "complete"
+    assert result.suggested_module_type == "worked_example"
+    assert result.suggested_module_title == "Optimization walkthrough"
+    assert result.suggested_module_focus == "A numerical example"
+
+
 def test_module_intent_rejects_unsupported_module_type(initialized_engine: Engine) -> None:
     _upsert(initialized_engine, "concept_x", "Existing Concept")
     search = ConceptSearchResult(

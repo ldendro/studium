@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+from sqlalchemy.engine import Engine
+
 from studium.evaluate import (
     APPROVED_THRESHOLDS,
     load_evaluation_cases,
@@ -9,12 +12,16 @@ from studium.evaluate import (
     recall_at_k,
     report_to_markdown,
 )
-from studium.evaluate.harness import generate_evaluation_report
+from studium.evaluate.harness import (
+    generate_evaluation_report,
+    run_recommendation_evaluation,
+)
 from studium.evaluate.models import (
     EvaluationCase,
     RecommendationCaseResult,
     RetrievalCaseResult,
 )
+from studium.llm import DeterministicLLMProvider
 
 
 def test_load_cases() -> None:
@@ -206,3 +213,55 @@ def test_fallback_no_results_passes_expected_empty_search_gate() -> None:
     report = generate_evaluation_report(cases=[case], retrieval=retrieval, recommendations=[])
 
     assert report.thresholds_met is True
+
+
+def test_exact_accuracy_ignores_cases_that_allow_related_results() -> None:
+    case = EvaluationCase(
+        case_id="exact-or-related",
+        query="flexible lookup",
+        required_candidate_ids=["concept-related"],
+        expected_resolution_states=["exact_match", "related_results"],
+    )
+    retrieval = [
+        RetrievalCaseResult(
+            case_id=case.case_id,
+            hit=True,
+            reciprocal_rank=1.0,
+            ranked_ids=["concept-related"],
+            resolution_state="related_results",
+            search_status="complete",
+        )
+    ]
+
+    report = generate_evaluation_report(cases=[case], retrieval=retrieval, recommendations=[])
+
+    assert report.exact_lookup_accuracy == 1.0
+    assert report.thresholds_met is True
+
+
+def test_recommendation_evaluation_rejects_unlabeled_case(
+    initialized_engine: Engine,
+) -> None:
+    case = EvaluationCase(case_id="unlabeled", query="anything")
+
+    with pytest.raises(ValueError, match="has no acceptable action labels"):
+        run_recommendation_evaluation(initialized_engine, [case])
+
+
+def test_recommendation_evaluation_records_failed_llm_structure(
+    initialized_engine: Engine,
+) -> None:
+    case = EvaluationCase(
+        case_id="invalid-structure",
+        query="brand new concept",
+        acceptable_actions=["create_new_concept"],
+    )
+
+    results = run_recommendation_evaluation(
+        initialized_engine,
+        [case],
+        provider=DeterministicLLMProvider(default_response={}),
+    )
+
+    assert results[0].action == "create_new_concept"
+    assert results[0].structured_ok is False

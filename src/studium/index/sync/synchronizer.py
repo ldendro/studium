@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Engine
+from sqlalchemy.engine import Connection
 
 from studium.index.config import IndexConfig
-from studium.index.engine import begin_connection
 from studium.index.repositories import (
     concepts,
     indexed_files,
@@ -17,10 +17,10 @@ from studium.index.repositories import (
     projections,
     scaffold_modules,
 )
+from studium.index.schema import index_metadata
 from studium.index.schema_manager import (
     ensure_compatible_index,
     get_index_revision,
-    increment_index_revision,
     rebuild_index,
 )
 from studium.index.sync.classify import FileAnalysis, analyze_vault_files
@@ -66,42 +66,59 @@ def sync_vault(vault: Vault, engine: Engine, config: IndexConfig) -> SyncReport:
             ],
         )
 
-    revision_before = get_index_revision(engine)
-    pending_revision = revision_before + 1
     scanned = scan_vault(vault)
-
-    with engine.connect() as connection:
-        indexed_rows = indexed_files.list_indexed_files(connection)
-
-    analyses = analyze_vault_files(scanned, indexed_rows)
     counts = SyncCounts(scanned=len(scanned))
     embedding_work: list[EmbeddingWorkRequest] = []
     warnings: list[str] = []
     errors: list[str] = []
     usable_state_changed = False
 
-    for analysis in analyses:
+    # Publish all projections and their revision as one SQLite transaction. Readers
+    # can therefore observe either the complete old index or the complete new one,
+    # never a file-by-file mixture.
+    with engine.connect() as connection:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
         try:
-            changed, work = _apply_analysis(
-                engine,
-                analysis,
-                pending_revision=pending_revision,
-                counts=counts,
-            )
-            usable_state_changed = usable_state_changed or changed
-            embedding_work.extend(work)
-            if changed and analysis.sync_class in {
-                FileSyncClass.INVALID,
-                FileSyncClass.DUPLICATE_ID_CONFLICT,
-            }:
-                warnings.extend(analysis.reasons)
-        except Exception as exc:
-            # Processing failures are reported in errors, not as validation invalids.
-            errors.append(f"{analysis.path}: {exc}")
+            meta = connection.execute(index_metadata.select().limit(1)).mappings().first()
+            if meta is None:
+                raise RuntimeError("Index metadata is missing")
+            revision_before = int(meta["index_revision"])
+            pending_revision = revision_before + 1
+            indexed_rows = indexed_files.list_indexed_files(connection)
+            analyses = analyze_vault_files(scanned, indexed_rows)
 
-    revision_after = revision_before
-    if usable_state_changed:
-        revision_after = increment_index_revision(engine)
+            for analysis in analyses:
+                try:
+                    with connection.begin_nested():
+                        changed, work = _apply_analysis(
+                            connection,
+                            analysis,
+                            pending_revision=pending_revision,
+                            counts=counts,
+                        )
+                    usable_state_changed = usable_state_changed or changed
+                    embedding_work.extend(work)
+                    if changed and analysis.sync_class in {
+                        FileSyncClass.INVALID,
+                        FileSyncClass.DUPLICATE_ID_CONFLICT,
+                    }:
+                        warnings.extend(analysis.reasons)
+                except Exception as exc:
+                    # Processing failures are reported in errors, not as validation invalids.
+                    errors.append(f"{analysis.path}: {exc}")
+
+            revision_after = revision_before
+            if usable_state_changed:
+                revision_after = pending_revision
+                connection.execute(
+                    index_metadata.update()
+                    .where(index_metadata.c.id == int(meta["id"]))
+                    .values(index_revision=revision_after, updated_at=_utc_now_iso())
+                )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
 
     status = _resolve_status(counts, errors, usable_state_changed)
     return SyncReport(
@@ -146,7 +163,7 @@ def _resolve_status(
 
 
 def _apply_analysis(
-    engine: Engine,
+    connection: Connection,
     analysis: FileAnalysis,
     *,
     pending_revision: int,
@@ -157,12 +174,15 @@ def _apply_analysis(
         return False, []
 
     if analysis.sync_class == FileSyncClass.REMOVED:
-        return _remove_file(engine, analysis, pending_revision=pending_revision, counts=counts), []
+        return (
+            _remove_file(connection, analysis, pending_revision=pending_revision, counts=counts),
+            [],
+        )
 
     if analysis.sync_class == FileSyncClass.INVALID:
         return (
             _mark_invalid(
-                engine,
+                connection,
                 analysis,
                 pending_revision=pending_revision,
                 counts=counts,
@@ -174,7 +194,7 @@ def _apply_analysis(
     if analysis.sync_class == FileSyncClass.DUPLICATE_ID_CONFLICT:
         return (
             _mark_invalid(
-                engine,
+                connection,
                 analysis,
                 pending_revision=pending_revision,
                 counts=counts,
@@ -194,39 +214,38 @@ def _apply_analysis(
         file_hash=analysis.scanned.file_hash,
         indexed_revision=pending_revision,
     )
-    previous_concept = _load_previous_concept(engine, projection.concept_id)
-    previous_modules = _load_previous_modules(engine, projection.concept_id)
+    previous_concept = _load_previous_concept(connection, projection.concept_id)
+    previous_modules = _load_previous_modules(connection, projection.concept_id)
 
-    with begin_connection(engine) as connection:
-        # Path-owned concept ID changed (A → B): drop the old projection first.
-        if analysis.previous is not None and analysis.moved_from is None:
-            previous_id = analysis.previous.get("concept_id")
-            if previous_id is not None and str(previous_id) != projection.concept_id:
-                existing = concepts.get_concept(connection, str(previous_id))
-                if existing is not None and existing.get("file_path") == analysis.path:
-                    projections.remove_concept_projection(connection, str(previous_id))
+    # Path-owned concept ID changed (A → B): drop the old projection first.
+    if analysis.previous is not None and analysis.moved_from is None:
+        previous_id = analysis.previous.get("concept_id")
+        if previous_id is not None and str(previous_id) != projection.concept_id:
+            existing = concepts.get_concept(connection, str(previous_id))
+            if existing is not None and existing.get("file_path") == analysis.path:
+                projections.remove_concept_projection(connection, str(previous_id))
 
-        if analysis.sync_class == FileSyncClass.MOVED and analysis.moved_from is not None:
-            indexed_files.delete_indexed_file(connection, analysis.moved_from)
-            invalid_records.delete_invalid_records_for_path(connection, analysis.moved_from)
+    if analysis.sync_class == FileSyncClass.MOVED and analysis.moved_from is not None:
+        indexed_files.delete_indexed_file(connection, analysis.moved_from)
+        invalid_records.delete_invalid_records_for_path(connection, analysis.moved_from)
 
-        projections.upsert_concept_projection(
-            connection,
-            concept=projection.concept,
-            alias_values=projection.alias_values,
-            domain_values=projection.domain_values,
-            encounter_rows=projection.encounter_rows,
-            relationship_rows=projection.relationship_rows,
-            module_rows=projection.module_rows,
-            concept_search_document=projection.concept_search_document,
-            module_search_documents=projection.module_search_documents,
-            indexed_file=indexed_file_row_for_projection(
-                projection,
-                mtime_ns=analysis.scanned.mtime_ns,
-                indexed_at=_utc_now_iso(),
-                revision=pending_revision,
-            ),
-        )
+    projections.upsert_concept_projection(
+        connection,
+        concept=projection.concept,
+        alias_values=projection.alias_values,
+        domain_values=projection.domain_values,
+        encounter_rows=projection.encounter_rows,
+        relationship_rows=projection.relationship_rows,
+        module_rows=projection.module_rows,
+        concept_search_document=projection.concept_search_document,
+        module_search_documents=projection.module_search_documents,
+        indexed_file=indexed_file_row_for_projection(
+            projection,
+            mtime_ns=analysis.scanned.mtime_ns,
+            indexed_at=_utc_now_iso(),
+            revision=pending_revision,
+        ),
+    )
 
     # Counters only after a successful commit (upsert rolled back ⇒ no count bump).
     if analysis.sync_class == FileSyncClass.MOVED:
@@ -245,26 +264,25 @@ def _apply_analysis(
 
 
 def _remove_file(
-    engine: Engine,
+    connection: Connection,
     analysis: FileAnalysis,
     *,
     pending_revision: int,
     counts: SyncCounts,
 ) -> bool:
     del pending_revision  # reserved for future tombstone revisions
-    with begin_connection(engine) as connection:
-        if analysis.concept_id is not None:
-            existing = concepts.get_concept(connection, analysis.concept_id)
-            if existing is not None and existing.get("file_path") == analysis.path:
-                projections.remove_concept_projection(connection, analysis.concept_id)
-        indexed_files.delete_indexed_file(connection, analysis.path)
-        invalid_records.delete_invalid_records_for_path(connection, analysis.path)
+    if analysis.concept_id is not None:
+        existing = concepts.get_concept(connection, analysis.concept_id)
+        if existing is not None and existing.get("file_path") == analysis.path:
+            projections.remove_concept_projection(connection, analysis.concept_id)
+    indexed_files.delete_indexed_file(connection, analysis.path)
+    invalid_records.delete_invalid_records_for_path(connection, analysis.path)
     counts.removed += 1
     return True
 
 
 def _mark_invalid(
-    engine: Engine,
+    connection: Connection,
     analysis: FileAnalysis,
     *,
     pending_revision: int,
@@ -297,60 +315,59 @@ def _mark_invalid(
         if remove_concept_id is not None:
             remove_concept_id = str(remove_concept_id)
 
-    with begin_connection(engine) as connection:
-        if analysis.moved_from is not None:
-            old = indexed_files.get_indexed_file(connection, analysis.moved_from)
-            if old is not None:
-                old_concept_id = old.get("concept_id")
-                if old_concept_id is not None:
-                    existing = concepts.get_concept(connection, str(old_concept_id))
-                    if existing is not None and existing.get("file_path") == analysis.moved_from:
-                        projections.remove_concept_projection(connection, str(old_concept_id))
-                indexed_files.delete_indexed_file(connection, analysis.moved_from)
-                invalid_records.delete_invalid_records_for_path(connection, analysis.moved_from)
+    if analysis.moved_from is not None:
+        old = indexed_files.get_indexed_file(connection, analysis.moved_from)
+        if old is not None:
+            old_concept_id = old.get("concept_id")
+            if old_concept_id is not None:
+                existing = concepts.get_concept(connection, str(old_concept_id))
+                if existing is not None and existing.get("file_path") == analysis.moved_from:
+                    projections.remove_concept_projection(connection, str(old_concept_id))
+            indexed_files.delete_indexed_file(connection, analysis.moved_from)
+            invalid_records.delete_invalid_records_for_path(connection, analysis.moved_from)
 
-        # If this path previously owned a different concept id, remove that too.
-        # Only compare when the current concept id is known; otherwise
-        # ``str(previous_id) != None`` would always be true and drop the wrong row.
-        if analysis.previous is not None and analysis.moved_from is None:
-            previous_id = analysis.previous.get("concept_id")
-            if (
-                previous_id is not None
-                and remove_concept_id is not None
-                and str(previous_id) != remove_concept_id
-            ):
-                existing = concepts.get_concept(connection, str(previous_id))
-                if existing is not None and existing.get("file_path") == analysis.path:
-                    projections.remove_concept_projection(connection, str(previous_id))
+    # If this path previously owned a different concept id, remove that too.
+    # Only compare when the current concept id is known; otherwise
+    # ``str(previous_id) != None`` would always be true and drop the wrong row.
+    if analysis.previous is not None and analysis.moved_from is None:
+        previous_id = analysis.previous.get("concept_id")
+        if (
+            previous_id is not None
+            and remove_concept_id is not None
+            and str(previous_id) != remove_concept_id
+        ):
+            existing = concepts.get_concept(connection, str(previous_id))
+            if existing is not None and existing.get("file_path") == analysis.path:
+                projections.remove_concept_projection(connection, str(previous_id))
 
-        projections.mark_path_invalid(
-            connection,
-            indexed_file={
-                "file_path": analysis.path,
-                "concept_id": analysis.concept_id,
-                "note_schema_version": None,
-                "file_hash": file_hash,
-                "projection_hash": None,
-                "mtime_ns": mtime_ns,
-                "index_state": analysis.sync_class.value,
-                "last_success_revision": None
-                if analysis.previous is None
-                else analysis.previous.get("last_success_revision"),
-                "invalid_since_revision": pending_revision,
-                "validation_errors_json": json.dumps(details, sort_keys=True),
-                "indexed_at": _utc_now_iso(),
-            },
-            invalid_record={
-                "file_path": analysis.path,
-                "concept_id": analysis.concept_id,
-                "reason_code": reason_code,
-                "message": message,
-                "details_json": json.dumps(details, sort_keys=True),
-                "since_revision": pending_revision,
-                "recorded_at": _utc_now_iso(),
-            },
-            remove_concept_id=None if remove_concept_id is None else str(remove_concept_id),
-        )
+    projections.mark_path_invalid(
+        connection,
+        indexed_file={
+            "file_path": analysis.path,
+            "concept_id": analysis.concept_id,
+            "note_schema_version": None,
+            "file_hash": file_hash,
+            "projection_hash": None,
+            "mtime_ns": mtime_ns,
+            "index_state": analysis.sync_class.value,
+            "last_success_revision": None
+            if analysis.previous is None
+            else analysis.previous.get("last_success_revision"),
+            "invalid_since_revision": pending_revision,
+            "validation_errors_json": json.dumps(details, sort_keys=True),
+            "indexed_at": _utc_now_iso(),
+        },
+        invalid_record={
+            "file_path": analysis.path,
+            "concept_id": analysis.concept_id,
+            "reason_code": reason_code,
+            "message": message,
+            "details_json": json.dumps(details, sort_keys=True),
+            "since_revision": pending_revision,
+            "recorded_at": _utc_now_iso(),
+        },
+        remove_concept_id=None if remove_concept_id is None else str(remove_concept_id),
+    )
 
     if count_as_duplicate:
         counts.duplicate_conflicts += 1
@@ -359,14 +376,12 @@ def _mark_invalid(
     return True
 
 
-def _load_previous_concept(engine: Engine, concept_id: str) -> dict[str, Any] | None:
-    with engine.connect() as connection:
-        return concepts.get_concept(connection, concept_id)
+def _load_previous_concept(connection: Connection, concept_id: str) -> dict[str, Any] | None:
+    return concepts.get_concept(connection, concept_id)
 
 
-def _load_previous_modules(engine: Engine, concept_id: str) -> dict[str, dict[str, Any]]:
-    with engine.connect() as connection:
-        rows = scaffold_modules.list_modules_for_concept(connection, concept_id)
+def _load_previous_modules(connection: Connection, concept_id: str) -> dict[str, dict[str, Any]]:
+    rows = scaffold_modules.list_modules_for_concept(connection, concept_id)
     return {str(row["module_id"]): row for row in rows}
 
 

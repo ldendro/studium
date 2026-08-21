@@ -137,6 +137,9 @@ class CreateNewConceptRecommendation(RecommendationEnvelope):
     backlog_candidates: list[BacklogCandidate] = Field(default_factory=_empty_backlog)
     possible_match_ids: list[str] = Field(default_factory=_empty_strings)
     graph_positions: list[GraphPositionSuggestion] = Field(default_factory=_empty_graph_positions)
+    suggested_module_type: ScaffoldModuleType | None = None
+    suggested_module_title: str | None = None
+    suggested_module_focus: str | None = None
 
 
 class AddLearningEncounterRecommendation(RecommendationEnvelope):

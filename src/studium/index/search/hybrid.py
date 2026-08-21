@@ -73,6 +73,21 @@ def search_concepts(
     Does not invoke LLM reasoning. Callers supply embedding vectors or a provider
     for vector channels; without either, Tier 1 falls back to FTS-only (partial).
     """
+    while True:
+        result = _search_concepts_once(engine, query, options=options)
+        # Synchronization publishes all projections and the revision atomically.
+        # If it committed while this search's independent read connections were
+        # running, discard the mixed attempt and read the newly published snapshot.
+        if result.index_revision == get_index_revision(engine):
+            return result
+
+
+def _search_concepts_once(
+    engine: Engine,
+    query: ConceptSearchQuery | str,
+    *,
+    options: HybridSearchOptions | None = None,
+) -> ConceptSearchResult:
     opts = options or HybridSearchOptions()
     search_query = (
         query if isinstance(query, ConceptSearchQuery) else ConceptSearchQuery(text=query)

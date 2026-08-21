@@ -140,6 +140,10 @@ def run_recommendation_evaluation(
 ) -> list[RecommendationCaseResult]:
     results: list[RecommendationCaseResult] = []
     for case in cases:
+        if not case.acceptable_actions:
+            raise ValueError(
+                f"Recommendation case {case.case_id!r} has no acceptable action labels"
+            )
         search = search_concepts(
             engine,
             ConceptSearchQuery(
@@ -162,7 +166,7 @@ def run_recommendation_evaluation(
             )
             continue
         action = outcome.action
-        action_ok = not case.acceptable_actions or action in case.acceptable_actions
+        action_ok = action in case.acceptable_actions
         target_id = getattr(outcome, "target_concept_id", None)
         if target_id is not None:
             action_ok = (
@@ -175,7 +179,7 @@ def run_recommendation_evaluation(
                 case_id=case.case_id,
                 action=action,
                 action_ok=action_ok,
-                structured_ok=True,
+                structured_ok=bool(outcome.diagnostics.get("structured_generation_ok", True)),
             )
         )
     return results
@@ -218,7 +222,7 @@ def generate_evaluation_report(
     exact_cases = [
         case
         for case in cases
-        if ResolutionState.EXACT_MATCH.value in case.expected_resolution_states
+        if set(case.expected_resolution_states) == {ResolutionState.EXACT_MATCH.value}
     ]
     exact_ok = 0
     for case in exact_cases:

@@ -313,6 +313,11 @@ def recommend(
                         *fallback.evidence,
                         f"identity_reasoning_failed:{identity.error_code or 'identity_failed'}",
                     ],
+                    "diagnostics": {
+                        **fallback.diagnostics,
+                        "structured_generation_ok": False,
+                        "structured_generation_error": (identity.error_code or "identity_failed"),
+                    },
                 }
             )
         if (
@@ -375,6 +380,28 @@ def recommend(
             )
             if (
                 module_decision is not None
+                and module_decision.classification == ModuleIntentClassification.CREATE_WITH_CONCEPT
+            ):
+                return CreateNewConceptRecommendation(
+                    confidence=ConfidenceLevel(module_decision.confidence.value),
+                    completion_status=CompletionStatus.COMPLETE,
+                    reasoning_mode=ReasoningMode.LLM,
+                    index_revision=revision,
+                    evidence=[*module_decision.evidence, module_decision.rationale],
+                    suggested_title=query_text,
+                    suggested_concept_type="general_concept",
+                    scope_summary=module_decision.rationale,
+                    possible_match_ids=[
+                        candidate.concept_id for candidate in search.ranked_concepts[:5]
+                    ],
+                    suggested_module_type=(
+                        module_decision.suggested_module_type or ScaffoldModuleType.DERIVATION
+                    ),
+                    suggested_module_title=(module_decision.suggested_title or query_text[:80]),
+                    suggested_module_focus=module_decision.suggested_focus,
+                )
+            if (
+                module_decision is not None
                 and module_decision.classification == ModuleIntentClassification.ADD_TO_EXISTING
                 and module_target_id is not None
                 and module_target_id in candidate_ids
@@ -426,6 +453,16 @@ def recommend(
                     if module_decision is not None
                     else ["module_intent_reasoning_failed"]
                 ),
+                diagnostics=(
+                    {}
+                    if module_decision is not None
+                    else {
+                        "structured_generation_ok": False,
+                        "structured_generation_error": (
+                            module_result.error_code or "module_intent_failed"
+                        ),
+                    }
+                ),
                 ambiguity_type="module_parent_target",
                 candidate_interpretations=[
                     candidate.concept_id for candidate in search.ranked_concepts[:5]
@@ -453,7 +490,12 @@ def recommend(
         analysis = reason_new_concept(provider, search)
         if not analysis.ok or analysis.data is None:
             # Fallback: create-new with search evidence only
-            return _fallback_create_new(search, query_text, revision)
+            return _fallback_create_new(
+                search,
+                query_text,
+                revision,
+                structured_generation_error=(analysis.error_code or "new_concept_analysis_failed"),
+            )
 
         data = analysis.data
         backlog = [
@@ -530,6 +572,8 @@ def _fallback_create_new(
     search: ConceptSearchResult,
     query_text: str,
     revision: int,
+    *,
+    structured_generation_error: str | None = None,
 ) -> CreateNewConceptRecommendation:
     return CreateNewConceptRecommendation(
         confidence=ConfidenceLevel.LOW,
@@ -538,6 +582,14 @@ def _fallback_create_new(
         index_revision=revision,
         evidence=["no_strong_match"],
         warnings=["Created without LLM analysis"],
+        diagnostics=(
+            {}
+            if structured_generation_error is None
+            else {
+                "structured_generation_ok": False,
+                "structured_generation_error": structured_generation_error,
+            }
+        ),
         suggested_title=query_text,
         suggested_concept_type="general_concept",
         suggested_domains=[],

@@ -86,6 +86,45 @@ def test_tier0_exact_match(initialized_engine: Engine) -> None:
     assert result.diagnostics == {}
 
 
+def test_search_retries_when_index_revision_changes(
+    initialized_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from studium.index.search import hybrid as hybrid_module
+
+    attempts = 0
+
+    def search_once(
+        _engine: Engine,
+        query: ConceptSearchQuery | str,
+        *,
+        options: HybridSearchOptions | None = None,
+    ):
+        nonlocal attempts
+        del options
+        attempts += 1
+        return hybrid_module.ConceptSearchResult(
+            query=(
+                query if isinstance(query, ConceptSearchQuery) else ConceptSearchQuery(text=query)
+            ),
+            index_revision=attempts,
+            search_status=SearchStatus.FALLBACK,
+            resolution_state=ResolutionState.NO_RESULTS,
+        )
+
+    monkeypatch.setattr(hybrid_module, "_search_concepts_once", search_once)
+
+    def current_revision(_engine: Engine) -> int:
+        return 2
+
+    monkeypatch.setattr(hybrid_module, "get_index_revision", current_revision)
+
+    result = hybrid_module.search_concepts(initialized_engine, "query")
+
+    assert attempts == 2
+    assert result.index_revision == 2
+
+
 def test_tier0_exact_match_honors_zero_concept_limit(initialized_engine: Engine) -> None:
     _upsert_concept(initialized_engine, "concept_exact_zero", "Exact Zero")
     result = search_concepts(
