@@ -20,6 +20,7 @@ from studium.index.search.models import (
     ConceptSearchFilters,
     ConceptSearchQuery,
     ResolutionState,
+    SearchStatus,
 )
 from studium.llm.protocol import LLMProvider
 from studium.recommend.models import RecommendationFailure
@@ -260,7 +261,12 @@ def generate_evaluation_report(
     )
     tier1_status_met = retrieval_coverage_met and all(
         retrieval_by_case[case.case_id].resolution_state == ResolutionState.EXACT_MATCH.value
-        or retrieval_by_case[case.case_id].search_status == "complete"
+        or retrieval_by_case[case.case_id].search_status == SearchStatus.COMPLETE.value
+        or (
+            retrieval_by_case[case.case_id].resolution_state == ResolutionState.NO_RESULTS.value
+            and retrieval_by_case[case.case_id].search_status == SearchStatus.FALLBACK.value
+            and ResolutionState.NO_RESULTS.value in case.expected_resolution_states
+        )
         for case in cases
     )
     retrieval_met = (

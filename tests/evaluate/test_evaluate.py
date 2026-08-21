@@ -183,3 +183,26 @@ def test_partial_tier1_search_does_not_pass_hybrid_retrieval_gate() -> None:
 
     assert report.recall_at_5 == 1.0
     assert report.thresholds_met is False
+
+
+def test_fallback_no_results_passes_expected_empty_search_gate() -> None:
+    case = EvaluationCase(
+        case_id="expected-empty",
+        query="unrelated gibberish",
+        prohibited_identity_ids=["known-concept"],
+        expected_resolution_states=["no_results"],
+    )
+    retrieval = [
+        RetrievalCaseResult(
+            case_id=case.case_id,
+            hit=True,
+            reciprocal_rank=0.0,
+            ranked_ids=[],
+            resolution_state="no_results",
+            search_status="fallback",
+        )
+    ]
+
+    report = generate_evaluation_report(cases=[case], retrieval=retrieval, recommendations=[])
+
+    assert report.thresholds_met is True
