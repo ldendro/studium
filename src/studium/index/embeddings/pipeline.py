@@ -18,6 +18,9 @@ from studium.index.sync.models import EmbeddingWorkRequest
 
 # Persisted sentinel: prior dimension-mismatch rejection for this input/model.
 _REJECTION_DIMENSION = 0
+# Retryable invalid provider output. Kept non-searchable without suppressing the
+# same input/model request when the provider recovers.
+_RETRYABLE_FAILURE_DIMENSION = -1
 
 
 def _utc_now_iso() -> str:
@@ -166,7 +169,7 @@ def process_embedding_work(
                             meta,
                             parent_concept_id=parent_concept_id,
                             vector_blob=b"",
-                            dimension=_REJECTION_DIMENSION,
+                            dimension=_RETRYABLE_FAILURE_DIMENSION,
                             indexed_revision=indexed_revision,
                             created_at=now,
                         ),

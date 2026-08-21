@@ -188,8 +188,22 @@ def test_invalid_provider_vectors_are_rejected(
             embedding_type="concept_identity",
         )
     assert row is not None
-    assert int(row["dimension"]) == 0
+    assert int(row["dimension"]) == -1
     assert row["input_hash"] == "hash-invalid"
+
+    class RecoveredProvider(InvalidProvider):
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [[1.0, 0.0, 0.0, 0.0] for _text in texts]
+
+    retry = process_embedding_work(
+        initialized_engine,
+        work,
+        RecoveredProvider(),
+        indexed_revision=2,
+    )
+    assert retry.skipped == 0
+    assert retry.failed == 0
+    assert retry.written == 1
 
 
 def test_matching_invalid_persisted_vector_is_regenerated(initialized_engine: Engine) -> None:
