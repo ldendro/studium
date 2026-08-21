@@ -284,6 +284,36 @@ def test_same_source_and_unit_with_different_section_is_new_encounter() -> None:
     assert comparison.outcome == EncounterOutcome.SAME_SOURCE_NEW_UNIT
 
 
+def test_new_unit_is_unambiguous_across_multiple_source_encounters() -> None:
+    existing_rows = [
+        {
+            "id": index,
+            "concept_id": "concept_linear_models",
+            "source_type": "book",
+            "source_title": "Machine Learning",
+            "unit": f"Chapter {index}",
+            "unit_type": "chapter",
+            "section": None,
+            "link": None,
+            "external_id_type": None,
+            "external_id_value": None,
+        }
+        for index in (1, 2)
+    ]
+    candidate = normalize_source_identity(
+        source_type="book",
+        source_title="Machine Learning",
+        unit_type="chapter",
+        unit="Chapter 3",
+    )
+
+    comparison = compare_against_rows(existing_rows, candidate=candidate)
+
+    assert comparison.outcome == EncounterOutcome.SAME_SOURCE_NEW_UNIT
+    assert comparison.matched_encounter_id is None
+    assert comparison.evidence == {"new_unit": "chapter 3", "same_source_count": 2}
+
+
 def test_external_identifier_values_preserve_case() -> None:
     upper = normalize_source_identity(
         source_type="video",

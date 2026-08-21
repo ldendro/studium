@@ -167,6 +167,49 @@ def test_tier1_fts_only_partial(
     assert any("Vector channels skipped" in w for w in result.warnings)
 
 
+def test_module_only_fts_result_remains_complete(
+    vault_root: Path,
+    initialized_engine: Engine,
+    index_config: IndexConfig,
+) -> None:
+    write_concept_note(
+        vault_root,
+        "concepts/module-only.md",
+        id="concept_module_only",
+        canonical_title="Unrelated Parent Title",
+        modules_yaml=(
+            "scaffold_modules:\n"
+            "  - id: module_lexical_only\n"
+            "    type: derivation\n"
+            "    title: Quasar Flux Derivation\n"
+            "    status: scaffolded\n"
+            "    origin:\n"
+            "    focus: quasar flux identity\n"
+        ),
+    )
+    from studium.index import sync_vault
+
+    sync_vault(Vault(vault_root), initialized_engine, index_config)
+    result = search_concepts(
+        initialized_engine,
+        "quasar flux",
+        options=HybridSearchOptions(
+            query_identity_vector=[1.0, 0.0],
+            query_semantic_vector=[1.0, 0.0],
+            model_filter=ModelSpaceFilter(
+                model_id="empty-model",
+                model_revision="test",
+                dimension=2,
+            ),
+        ),
+    )
+
+    assert result.search_status == SearchStatus.COMPLETE
+    assert result.resolution_state == ResolutionState.RELATED_RESULTS
+    assert [hit.module_id for hit in result.module_hits] == ["module_lexical_only"]
+    assert [candidate.concept_id for candidate in result.ranked_concepts] == ["concept_module_only"]
+
+
 def test_tier1_with_fake_embeddings(
     vault_root: Path,
     initialized_engine: Engine,

@@ -516,6 +516,7 @@ def _tier1_hybrid(
 
     if (
         not fts_concepts
+        and not fts_modules
         and not identity_hits
         and not semantic_hits
         and not module_vector_hits

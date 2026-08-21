@@ -170,6 +170,18 @@ def compare_against_rows(
     compatible = [
         row for row in same_source if _fields_compatible(identity_from_row(row), candidate)
     ]
+    if not compatible and all(
+        _unit_differs(identity_from_row(row), candidate) for row in same_source
+    ):
+        return EncounterComparison(
+            outcome=EncounterOutcome.SAME_SOURCE_NEW_UNIT,
+            source_fingerprint=source_fp,
+            encounter_fingerprint=encounter_fp,
+            evidence={
+                "new_unit": candidate.unit,
+                "same_source_count": len(same_source),
+            },
+        )
     candidates = compatible or (same_source if len(same_source) == 1 else [])
     if len(candidates) != 1:
         return EncounterComparison(
