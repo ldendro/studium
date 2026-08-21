@@ -218,7 +218,7 @@ def recommend(
             comparison_outcome=comparison.outcome.value,
         )
 
-    if source_type and source_title and intent_target_id is None:
+    if source_type and source_title and intent_target_id is None and provider is None:
         return RequestClarificationRecommendation(
             confidence=ConfidenceLevel.LOW,
             completion_status=CompletionStatus.COMPLETE,
@@ -575,16 +575,26 @@ def assemble_alias_suggestion(
         )
     from studium.index.normalize import normalize_title
 
+    normalized_alias = normalize_title(alias)
     with engine.connect() as connection:
         target = concepts.get_concept(connection, target_concept_id)
+        existing_aliases = aliases.list_aliases_by_normalized_alias(connection, normalized_alias)
     assert target is not None
-    if normalize_title(alias) == str(target["normalized_title"]):
+    if normalized_alias == str(target["normalized_title"]):
         return assemble_recommendation_failure(
             query=alias,
             index_revision=0,
             stage=FailureStage.DETERMINISTIC_VERIFICATION,
             error_code="alias_matches_target_title",
             message="Alias must differ from the target concept's canonical title",
+        )
+    if any(str(row["concept_id"]) == target_concept_id for row in existing_aliases):
+        return assemble_recommendation_failure(
+            query=alias,
+            index_revision=0,
+            stage=FailureStage.DETERMINISTIC_VERIFICATION,
+            error_code="alias_already_exists",
+            message="Alias is already present on the target concept",
         )
     collisions = _alias_collision(engine, alias, target_concept_id=target_concept_id)
     warnings_evidence = list(evidence or [])

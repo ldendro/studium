@@ -148,7 +148,19 @@ def rank_module_hits(
     *,
     limit: int,
 ) -> list[VectorModuleHit]:
-    indices = top_k_indices(scores, corpus, limit=limit)
+    if limit <= 0:
+        return []
+    ordered_indices = top_k_indices(scores, corpus, limit=len(corpus))
+    seen_modules: set[str] = set()
+    indices: list[int] = []
+    for index in ordered_indices:
+        module_id = corpus[index].owner_id
+        if module_id in seen_modules:
+            continue
+        seen_modules.add(module_id)
+        indices.append(index)
+        if len(indices) >= limit:
+            break
     if not indices:
         return []
     hits: list[VectorModuleHit] = []

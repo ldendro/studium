@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.engine import Engine
 
 from studium.index import begin_connection
-from studium.index.repositories import concepts
+from studium.index.repositories import aliases, concepts
 from studium.index.search.models import (
     ChannelContribution,
     ConceptSearchQuery,
@@ -20,12 +20,14 @@ from studium.index.search.models import (
     SearchStatus,
 )
 from studium.llm import DeterministicLLMProvider
-from studium.recommend import recommend
+from studium.recommend import assemble_alias_suggestion, recommend
 from studium.recommend.models import (
     AddLearningEncounterRecommendation,
     AddScaffoldModuleRecommendation,
+    ConfidenceLevel,
     CreateNewConceptRecommendation,
     MarkRedundantRecommendation,
+    RecommendationFailure,
     RequestClarificationRecommendation,
     UseExistingConceptRecommendation,
 )
@@ -100,6 +102,68 @@ def test_source_type_is_normalized_for_encounter_recommendation(
 
     assert isinstance(result, AddLearningEncounterRecommendation)
     assert result.source_type.value == "book"
+
+
+def test_source_intent_uses_identity_reasoning_to_select_ranked_target(
+    initialized_engine: Engine,
+) -> None:
+    _upsert(initialized_engine, "concept_sgd", "Stochastic Gradient Descent")
+    search = ConceptSearchResult(
+        query=ConceptSearchQuery(text="iterative gradient optimizer"),
+        index_revision=1,
+        search_status=SearchStatus.COMPLETE,
+        resolution_state=ResolutionState.RELATED_RESULTS,
+        ranked_concepts=[
+            RankedConceptCandidate(
+                concept_id="concept_sgd",
+                canonical_title="Stochastic Gradient Descent",
+                fused_rank=1,
+                fused_score=0.1,
+            )
+        ],
+    )
+
+    result = recommend(
+        initialized_engine,
+        search=search,
+        provider=DeterministicLLMProvider(
+            default_response={
+                "classification": "same_concept",
+                "selected_concept_id": "concept_sgd",
+                "confidence": "high",
+                "rationale": "The paraphrase identifies the retrieved concept.",
+                "evidence": ["ranked candidate"],
+            }
+        ),
+        source_type="book",
+        source_title="Optimization Textbook",
+    )
+
+    assert isinstance(result, AddLearningEncounterRecommendation)
+    assert result.target_concept_id == "concept_sgd"
+
+
+def test_alias_suggestion_rejects_alias_already_on_target(
+    initialized_engine: Engine,
+) -> None:
+    _upsert(initialized_engine, "concept_alias_target", "Gradient Method")
+    with begin_connection(initialized_engine) as connection:
+        aliases.insert_alias(
+            connection,
+            concept_id="concept_alias_target",
+            alias="Steepest Descent",
+        )
+
+    result = assemble_alias_suggestion(
+        initialized_engine,
+        alias="steepest   descent",
+        target_concept_id="concept_alias_target",
+        classification="same_concept",
+        confidence=ConfidenceLevel.HIGH,
+    )
+
+    assert isinstance(result, RecommendationFailure)
+    assert result.error_code == "alias_already_exists"
 
 
 def test_invalid_source_type_requests_clarification(initialized_engine: Engine) -> None:

@@ -291,6 +291,66 @@ def test_module_hits_include_location_fields(initialized_engine: Engine) -> None
     assert hit.segment_id == ""
 
 
+def test_module_hit_limit_applies_after_segment_deduplication(
+    initialized_engine: Engine,
+) -> None:
+    _upsert_concept(initialized_engine, "concept_segment_parent", "Segment Parent")
+    with begin_connection(initialized_engine) as connection:
+        for module_id in ("module_many_segments", "module_next_best"):
+            scaffold_modules.upsert_scaffold_module(
+                connection,
+                {
+                    "module_id": module_id,
+                    "concept_id": "concept_segment_parent",
+                    "type": "derivation",
+                    "title": module_id,
+                    "status": "scaffolded",
+                    "indexed_revision": 1,
+                },
+            )
+    _insert_embedding(
+        initialized_engine,
+        owner_type="scaffold_module",
+        owner_id="module_many_segments",
+        embedding_type="module_semantic",
+        vector=[1.0, 0.0],
+        parent_concept_id="concept_segment_parent",
+        segment_id="module_many_segments:0",
+    )
+    _insert_embedding(
+        initialized_engine,
+        owner_type="scaffold_module",
+        owner_id="module_many_segments",
+        embedding_type="module_semantic",
+        vector=[0.99, 0.1],
+        parent_concept_id="concept_segment_parent",
+        segment_id="module_many_segments:1",
+    )
+    _insert_embedding(
+        initialized_engine,
+        owner_type="scaffold_module",
+        owner_id="module_next_best",
+        embedding_type="module_semantic",
+        vector=[0.8, 0.6],
+        parent_concept_id="concept_segment_parent",
+        segment_id="module_next_best:0",
+    )
+    model = ModelSpaceFilter(
+        model_id="fake-embedding",
+        model_revision="test",
+        dimension=2,
+    )
+
+    hits = search_module_semantic_vectors(initialized_engine, [1.0, 0.0], model, limit=2)
+
+    assert [hit.module_id for hit in hits] == [
+        "module_many_segments",
+        "module_next_best",
+    ]
+    assert [hit.rank for hit in hits] == [1, 2]
+    assert hits[0].segment_id == "module_many_segments:0"
+
+
 def test_empty_corpus(initialized_engine: Engine) -> None:
     model = ModelSpaceFilter(
         model_id="fake-embedding",
