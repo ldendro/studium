@@ -1,0 +1,12 @@
+case_id: p2-038
+query: Sample query 38 about biology
+domain: biology
+acceptable_actions:
+- create_new_concept
+required_candidate_ids: []
+prohibited_identity_ids:
+- __synthetic_no_match__
+expected_resolution_states:
+- no_results
+notes: Synthetic Phase 2 eval fixture; acceptable actions are soft targets for harness
+  wiring.

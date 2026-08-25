@@ -4,9 +4,10 @@ Studium is an AI-assisted learning system built around Markdown/Obsidian-compati
 concept notes, concept graphs, scaffold generation, source-aware learning workflows,
 and agent-based review.
 
-This repository currently implements **Phase 1: Vault Storage Core** — a pure-Python
-storage layer for reading, parsing, validating, serializing, and safely writing
-Obsidian-compatible concept notes in a test vault.
+This repository implements **Phase 1: Vault Storage Core** and **Phase 2: Concept
+Graph Core** — durable Markdown notes plus a derived SQLite concept index, hybrid
+retrieval, graph/encounter queries, local LLM reasoning, recommendations, evaluation,
+and a `studium graph` CLI.
 
 ## Requirements
 
@@ -86,9 +87,31 @@ Library entrypoints:
 - `studium.index.enumerate_embedding_work(engine)` — rebuild work from current projections
 - `studium.index.sync_and_embed(...)` — sync then embed (defaults to current projections)
 - `studium.index.embed_query(provider, text)` — ephemeral query vector
+- `studium.index.search_concept_identity_vectors` / `search_concept_semantic_vectors` /
+  `search_module_semantic_vectors` — cosine top-K over persisted embeddings
+- `studium.index.create_vector_backend(engine, name=...)` — `"numpy"` (default) or
+  `"sqlite_vec"`
+- `studium.index.search_concepts(engine, query)` — Tier 0 identity + Tier 1 hybrid RRF
+- `studium.index.graph.*` — one-hop relationships and encounter comparison
+- `studium.llm.run_reasoning_task` / `reason_identity` — structured local reasoning
+- `studium.recommend.recommend(...)` — action-specific recommendations (no note mutation)
+- `studium.evaluate.*` — retrieval/recommendation harness over `evals/phase2/cases`
 
-Lexical search and embedding generation are library-only in this phase (no CLI).
-Vector search / hybrid fusion come in later branches.
+## Graph CLI (Phase 2)
+
+```bash
+uv run studium graph sync --vault /path/to/vault --json
+uv run studium graph status --vault /path/to/vault
+uv run studium graph find "stochastic gradient" --vault /path/to/vault --json
+uv run studium graph propose "SGD" --vault /path/to/vault --json
+uv run python evals/phase2/seed_vault.py /tmp/studium-phase2-eval-vault
+uv run studium graph sync --vault /tmp/studium-phase2-eval-vault
+uv run studium graph evaluate-retrieval --vault /tmp/studium-phase2-eval-vault
+uv run studium graph evaluate-retrieval --vault /path/to/vault
+```
+
+Also: `rebuild`, `candidates`, `inspect`, `modules`, `relationships`,
+`evaluate-recommendations`. Flags: `--json`, `--diagnostics`, `--app-data`.
 
 Local embedding models (optional):
 
@@ -96,13 +119,24 @@ Local embedding models (optional):
 uv sync --extra embeddings
 ```
 
+Optional sqlite-vec backend (benchmark / opt-in tests):
+
+```bash
+uv sync --extra vector-ext
+uv run pytest -m vector_ext
+```
+
 Use `FakeEmbeddingProvider` in tests; `SentenceTransformersEmbeddingProvider` for
 real MiniLM-class models on a machine with the optional extra installed. Real-model
-tests are excluded by default; run them with:
+and live-LLM tests are excluded by default:
 
 ```bash
 uv run pytest -m embedding
+uv run pytest -m llm
 ```
+
+See `Docs/01 - Phase Roadmaps/Phase 2 - Concept Graph Core/5 - Phase Completion Note.md`
+for selected models/backends and known limits.
 
 ## Project structure
 
@@ -114,8 +148,12 @@ src/studium/
   serialization/  # concept note generation/serialization (P1-B5)
   validation/     # critical-error / warning validation (P1-B6)
   writes/         # safe write proposals + vault writes (P1-B7)
-  cli/            # minimal CLI (P1-B8)
-  index/          # SQLite index, sync, lexical search, embeddings (P2-B02–B05)
+  cli/            # Phase 1 + graph CLI (P1-B8, P2-B13)
+  index/          # SQLite index, sync, search, embeddings, graph (P2)
+  llm/            # provider-agnostic structured LLM + reasoning tasks
+  recommend/      # ConceptRecommendation assembly
+  evaluate/       # evaluation harness
+evals/phase2/     # curated Phase 2 evaluation cases
 tests/            # pytest test suite
 ```
 

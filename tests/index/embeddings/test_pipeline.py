@@ -110,6 +110,155 @@ def test_dimension_mismatch_fails_without_reembed_loop(
     assert len(provider.documents_calls) == 1
 
 
+@pytest.mark.parametrize(
+    "invalid_vector",
+    [
+        [float("nan"), 0.0, 0.0, 1.0],
+        [float("inf"), 0.0, 0.0, 1.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ],
+)
+def test_invalid_provider_vectors_are_rejected(
+    initialized_engine: Engine,
+    invalid_vector: list[float],
+) -> None:
+    from studium.index.embeddings.protocol import EmbeddingModelMetadata
+
+    class InvalidProvider:
+        def model_metadata(self) -> EmbeddingModelMetadata:
+            return EmbeddingModelMetadata(
+                model_id="invalid-vector",
+                model_revision="test",
+                dimension=4,
+                normalizes_embeddings=True,
+            )
+
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [invalid_vector for _text in texts]
+
+        def embed_query(self, text: str) -> list[float]:
+            return invalid_vector
+
+    _upsert_minimal_concept(initialized_engine, "concept_invalid", title="Invalid")
+    with begin_connection(initialized_engine) as connection:
+        embeddings_repo.insert_embedding(
+            connection,
+            {
+                "owner_type": "concept",
+                "owner_id": "concept_invalid",
+                "parent_concept_id": "concept_invalid",
+                "segment_id": "",
+                "embedding_type": "concept_identity",
+                "vector": pack_vector([1.0, 0.0, 0.0, 0.0]),
+                "dimension": 4,
+                "model_id": "invalid-vector",
+                "model_revision": "test",
+                "normalizes_embeddings": True,
+                "input_hash": "hash-before-change",
+                "created_at": "2026-01-01T00:00:00Z",
+                "indexed_revision": 1,
+            },
+        )
+    work = [
+        EmbeddingWorkRequest(
+            owner_type="concept",
+            owner_id="concept_invalid",
+            embedding_type="concept_identity",
+            input_hash="hash-invalid",
+            input_text="Title: Invalid\nAliases: ",
+            parent_concept_id="concept_invalid",
+        )
+    ]
+
+    report = process_embedding_work(
+        initialized_engine,
+        work,
+        InvalidProvider(),
+        indexed_revision=1,
+    )
+
+    assert report.failed == 1
+    assert report.written == 0
+    assert any("finite values" in error for error in report.errors)
+    with begin_connection(initialized_engine) as connection:
+        row = embeddings_repo.get_embedding_for_key(
+            connection,
+            owner_type="concept",
+            owner_id="concept_invalid",
+            embedding_type="concept_identity",
+        )
+    assert row is not None
+    assert int(row["dimension"]) == -1
+    assert row["input_hash"] == "hash-invalid"
+
+    class RecoveredProvider(InvalidProvider):
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            return [[1.0, 0.0, 0.0, 0.0] for _text in texts]
+
+    retry = process_embedding_work(
+        initialized_engine,
+        work,
+        RecoveredProvider(),
+        indexed_revision=2,
+    )
+    assert retry.skipped == 0
+    assert retry.failed == 0
+    assert retry.written == 1
+
+
+def test_matching_invalid_persisted_vector_is_regenerated(initialized_engine: Engine) -> None:
+    _upsert_minimal_concept(initialized_engine, "concept_regenerate", title="Regenerate")
+    with begin_connection(initialized_engine) as connection:
+        embeddings_repo.insert_embedding(
+            connection,
+            {
+                "owner_type": "concept",
+                "owner_id": "concept_regenerate",
+                "parent_concept_id": "concept_regenerate",
+                "segment_id": "",
+                "embedding_type": "concept_identity",
+                "vector": pack_vector([float("nan"), 0.0, 0.0, 1.0]),
+                "dimension": 4,
+                "model_id": "fake-embedding",
+                "model_revision": "test",
+                "normalizes_embeddings": True,
+                "input_hash": "hash-regenerate",
+                "created_at": "2026-01-01T00:00:00Z",
+                "indexed_revision": 1,
+            },
+        )
+    work = [
+        EmbeddingWorkRequest(
+            owner_type="concept",
+            owner_id="concept_regenerate",
+            embedding_type="concept_identity",
+            input_hash="hash-regenerate",
+            input_text="Title: Regenerate\nAliases: ",
+            parent_concept_id="concept_regenerate",
+        )
+    ]
+
+    report = process_embedding_work(
+        initialized_engine,
+        work,
+        FakeEmbeddingProvider(dimension=4),
+        indexed_revision=2,
+    )
+
+    assert report.skipped == 0
+    assert report.written == 1
+    with begin_connection(initialized_engine) as connection:
+        row = embeddings_repo.get_embedding_for_key(
+            connection,
+            owner_type="concept",
+            owner_id="concept_regenerate",
+            embedding_type="concept_identity",
+        )
+    assert row is not None
+    vector = unpack_vector(bytes(row["vector"]), dimension=4)
+    assert all(value == value for value in vector)
+
+
 def test_provider_exception_counts_batch_as_failed(
     initialized_engine: Engine,
 ) -> None:

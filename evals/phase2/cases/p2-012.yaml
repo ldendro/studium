@@ -1,0 +1,12 @@
+case_id: p2-012
+query: Sample query 12 about systems
+domain: systems
+acceptable_actions:
+- use_existing_concept
+required_candidate_ids:
+- concept_eval_012
+prohibited_identity_ids: []
+expected_resolution_states:
+- related_results
+notes: Synthetic Phase 2 eval fixture; acceptable actions are soft targets for harness
+  wiring.

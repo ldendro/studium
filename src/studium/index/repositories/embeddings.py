@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.engine import Connection
 
 from studium.index.repositories._util import inserted_int_pk, mapping
@@ -70,6 +70,73 @@ def list_module_embeddings_for_parent(
             embeddings.c.embedding_type == "module_semantic",
         )
         .order_by(embeddings.c.id)
+    ).all()
+    return [mapping(row) for row in rows]
+
+
+def list_embeddings_for_search(
+    connection: Connection,
+    *,
+    owner_type: str,
+    embedding_type: str,
+    model_id: str,
+    dimension: int,
+    model_revision: str | None = None,
+    normalizes_embeddings: bool = True,
+) -> list[dict[str, Any]]:
+    """Load searchable embedding rows for one type in a single model space.
+
+    Excludes B05 rejection sentinels (``dimension == 0``) and rows outside the
+    requested ``(model_id, model_revision, dimension, normalizes_embeddings)``.
+    """
+    if dimension <= 0:
+        return []
+    conditions = [
+        embeddings.c.owner_type == owner_type,
+        embeddings.c.embedding_type == embedding_type,
+        embeddings.c.model_id == model_id,
+        embeddings.c.dimension == dimension,
+        embeddings.c.dimension > 0,
+        embeddings.c.normalizes_embeddings == normalizes_embeddings,
+    ]
+    if model_revision is None:
+        conditions.append(embeddings.c.model_revision.is_(None))
+    else:
+        conditions.append(embeddings.c.model_revision == model_revision)
+    rows = connection.execute(
+        select(embeddings)
+        .where(*conditions)
+        .order_by(embeddings.c.owner_id, embeddings.c.segment_id)
+    ).all()
+    return [mapping(row) for row in rows]
+
+
+def list_model_spaces(connection: Connection) -> list[dict[str, Any]]:
+    """Return searchable model spaces, newest embedding generation first."""
+    rows = connection.execute(
+        select(
+            embeddings.c.model_id,
+            embeddings.c.model_revision,
+            embeddings.c.dimension,
+            embeddings.c.normalizes_embeddings,
+            func.count().label("embedding_count"),
+            func.count(func.distinct(embeddings.c.parent_concept_id)).label("concept_count"),
+            func.max(embeddings.c.created_at).label("created_at"),
+            func.max(embeddings.c.indexed_revision).label("indexed_revision"),
+        )
+        .where(embeddings.c.dimension > 0)
+        .group_by(
+            embeddings.c.model_id,
+            embeddings.c.model_revision,
+            embeddings.c.dimension,
+            embeddings.c.normalizes_embeddings,
+        )
+        .order_by(
+            func.count(func.distinct(embeddings.c.parent_concept_id)).desc(),
+            func.count().desc(),
+            func.max(embeddings.c.created_at).desc(),
+            embeddings.c.model_id,
+        )
     ).all()
     return [mapping(row) for row in rows]
 

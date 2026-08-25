@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 from typing import Any
 
@@ -10,13 +11,16 @@ from sqlalchemy import Engine
 
 from studium.index.config import DEFAULT_EMBEDDING_BATCH_SIZE
 from studium.index.embeddings.protocol import EmbeddingModelMetadata, EmbeddingProvider
-from studium.index.embeddings.serialize import pack_vector
+from studium.index.embeddings.serialize import pack_vector, unpack_vector
 from studium.index.engine import begin_connection
 from studium.index.repositories import embeddings as embeddings_repo
 from studium.index.sync.models import EmbeddingWorkRequest
 
 # Persisted sentinel: prior dimension-mismatch rejection for this input/model.
 _REJECTION_DIMENSION = 0
+# Retryable invalid provider output. Kept non-searchable without suppressing the
+# same input/model request when the provider recovers.
+_RETRYABLE_FAILURE_DIMENSION = -1
 
 
 def _utc_now_iso() -> str:
@@ -150,6 +154,27 @@ def process_embedding_work(
                         ),
                     )
                     continue
+                if not _is_valid_vector(vector, expected_dimension=meta.dimension):
+                    report.errors.append(
+                        f"{item.owner_id}/{item.embedding_type}: "
+                        "vector must contain finite values and have non-zero norm"
+                    )
+                    report.failed += 1
+                    # Replace any prior valid row so changed content cannot remain
+                    # searchable through a stale vector.
+                    embeddings_repo.upsert_embedding(
+                        connection,
+                        _embedding_row_values(
+                            item,
+                            meta,
+                            parent_concept_id=parent_concept_id,
+                            vector_blob=b"",
+                            dimension=_RETRYABLE_FAILURE_DIMENSION,
+                            indexed_revision=indexed_revision,
+                            created_at=now,
+                        ),
+                    )
+                    continue
                 embeddings_repo.upsert_embedding(
                     connection,
                     _embedding_row_values(
@@ -225,13 +250,34 @@ def _row_matches(
     stored_normalize = _as_bool(existing.get("normalizes_embeddings"))
     if stored_normalize is None:
         return False
-    return (
+    metadata_matches = (
         str(existing.get("input_hash")) == item.input_hash
         and str(existing.get("model_id")) == meta.model_id
         and int(existing.get("dimension") or 0) == meta.dimension
         and (existing.get("model_revision") == meta.model_revision)
         and stored_normalize == meta.normalizes_embeddings
     )
+    if not metadata_matches:
+        return False
+    raw_blob = existing.get("vector")
+    if isinstance(raw_blob, memoryview):
+        blob = raw_blob.tobytes()
+    elif isinstance(raw_blob, bytes):
+        blob = raw_blob
+    else:
+        return False
+    try:
+        vector = unpack_vector(blob, dimension=meta.dimension)
+    except ValueError:
+        return False
+    return _is_valid_vector(vector, expected_dimension=meta.dimension)
+
+
+def _is_valid_vector(vector: list[float], *, expected_dimension: int) -> bool:
+    if len(vector) != expected_dimension or not all(math.isfinite(value) for value in vector):
+        return False
+    squared_norm = math.fsum(value * value for value in vector)
+    return math.isfinite(squared_norm) and squared_norm > 0.0
 
 
 def _is_dimension_rejection(

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "10 - Concepts/Embedding Space.md",
+                "file": "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B06-vector-search-backend.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Embedding Space"
+              "title": "P2-B06-vector-search-backend"
             }
           }
         ]
@@ -187,15 +187,24 @@
   },
   "active": "ab327e63fe3d023e",
   "lastOpenFiles": [
-    "10 - Concepts/Dense Embedding.md",
-    "10 - Concepts/Embedding Space.md",
-    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B05-embedding-pipeline-and-model-selection.md",
-    "10 - Concepts/Untitled",
-    "10 - Concepts/Mean Reciprocal Rank (MRR).md",
-    "10 - Concepts/BM25 (Best Matching 25).md",
-    "10 - Concepts/Recall@K.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B12-integrated-evaluation-harness.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B13-cli-and-phase-verification.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B11-recommendation-models-and-assembly.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B10-reasoning-tasks-and-model-selection.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B09-llm-provider-and-task-framework.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B08-graph-and-source-encounter-queries.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B07-hybrid-retrieval-and-search-contract.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/5 - Phase Completion Note.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B06-vector-search-backend.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/4 - Branch Plan.md",
     "99 - Archive/Branch - Template.md",
+    "10 - Concepts/Recall@K.md",
+    "10 - Concepts/Mean Reciprocal Rank (MRR).md",
+    "10 - Concepts/Embedding Space.md",
+    "10 - Concepts/Dense Embedding.md",
+    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B05-embedding-pipeline-and-model-selection.md",
+    "10 - Concepts/Untitled",
+    "10 - Concepts/BM25 (Best Matching 25).md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B01-schema-v2-amendments.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches/P2-B04-weighted-full-text-search.md",
     "10 - Concepts",
@@ -206,16 +215,7 @@
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/3 - Technical Plan.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/3 - Technical Plan.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B1-core-package-foundation.md",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/4 - Branch Plan.md",
     "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/Branches",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/2 - Final Phase Roadmap.md",
-    "00 - Product Foundation/Feature Roadmap.md",
-    "00 - Product Foundation/Product Vision - Studium.md",
-    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/2 - Final Phase Roadmap.md",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/1 - Initial Phase Roadmap.md",
-    "01 - Phase Roadmaps/Phase 2 - Concept Graph Core/1 - Initial Phase Roadmap.md",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B8-cli-and-phase-verification.md",
-    "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches/P1-B7-write-proposals-vault-writes.md",
     "01 - Phase Roadmaps/Phase 1 - Vault Storage Core/Branches",
     "99 - Archive/Software Development Workflow Infographic.png",
     "Untitled.canvas",
