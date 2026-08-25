@@ -1,7 +1,5 @@
-import { markdown } from '@codemirror/lang-markdown'
-import { EditorView } from '@codemirror/view'
+import type { EditorView } from '@codemirror/view'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import CodeMirror from '@uiw/react-codemirror'
 import clsx from 'clsx'
 import {
   AlertTriangle,
@@ -26,12 +24,9 @@ import {
   Link,
   List,
   LoaderCircle,
-  MessageSquareText,
-  Minus,
   PenLine,
   Plus,
   Quote,
-  RefreshCw,
   Save,
   Search,
   ShieldCheck,
@@ -40,6 +35,8 @@ import {
   X,
 } from 'lucide-react'
 import {
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -99,34 +96,10 @@ const SOURCE_TYPES = [
   'chatbot',
 ]
 
-const editorTheme = EditorView.theme(
-  {
-    '&': {
-      height: '100%',
-      backgroundColor: '#0e141d',
-      color: '#dce2ea',
-      fontSize: '13px',
-    },
-    '.cm-content': {
-      padding: '22px 20px 40px',
-      caretColor: '#deb66a',
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-      lineHeight: '1.65',
-    },
-    '.cm-gutters': {
-      backgroundColor: '#0e141d',
-      color: '#4f5b6b',
-      border: 'none',
-      paddingLeft: '6px',
-    },
-    '.cm-activeLine, .cm-activeLineGutter': {
-      backgroundColor: 'rgba(255,255,255,.025)',
-    },
-    '&.cm-focused .cm-selectionBackground, ::selection': {
-      backgroundColor: 'rgba(120,168,212,.22) !important',
-    },
-  },
-  { dark: true },
+const MarkdownEditor = lazy(() =>
+  import('../components/MarkdownEditor').then((module) => ({
+    default: module.MarkdownEditor,
+  })),
 )
 
 export function CreatePage() {
@@ -226,6 +199,10 @@ export function CreatePage() {
       void queryClient.invalidateQueries({ queryKey: ['create-drafts'] })
     },
   })
+  const autosaveRef = useRef(autosaveMutation.mutate)
+  useEffect(() => {
+    autosaveRef.current = autosaveMutation.mutate
+  }, [autosaveMutation.mutate])
   const draftsQuery = useQuery({
     queryKey: ['create-drafts'],
     queryFn: () => api<{ drafts: DraftSnapshot[] }>('/api/create/drafts'),
@@ -241,7 +218,7 @@ export function CreatePage() {
     if (!currentDraft || step !== 'editor') return
     window.localStorage.setItem('studium:create-autosave', JSON.stringify(currentDraft))
     const timer = window.setTimeout(() => {
-      autosaveMutation.mutate({
+      autosaveRef.current({
         draft: currentDraft,
         title: proposal?.canonical_title ?? currentDraft.concept_id,
         recommendation: proposal?.raw_recommendation ?? null,
@@ -900,20 +877,13 @@ function EditorStep({
         </aside>
         <div className="editor-surface">
           {previewMode === 'write' ? (
-            <CodeMirror
-              value={markdownValue}
-              height="100%"
-              extensions={[markdown(), editorTheme, EditorView.lineWrapping]}
-              onCreateEditor={(view) => { editorRef.current = view }}
-              onChange={setMarkdownValue}
-              basicSetup={{
-                lineNumbers: true,
-                foldGutter: true,
-                highlightActiveLine: true,
-                autocompletion: true,
-                bracketMatching: true,
-              }}
-            />
+            <Suspense fallback={<div className="editor-loading"><LoaderCircle className="spin" /></div>}>
+              <MarkdownEditor
+                value={markdownValue}
+                onCreateEditor={(view) => { editorRef.current = view }}
+                onChange={setMarkdownValue}
+              />
+            </Suspense>
           ) : (
             <div className="editor-preview"><Markdown value={markdownValue.replace(/^---[\s\S]*?---\s*/, '')} /></div>
           )}

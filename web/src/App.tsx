@@ -1,4 +1,4 @@
-import { AlertTriangle, BrainCircuit, Inbox, LayoutDashboard, PenLine, RotateCcw, Settings, Sparkles, TimerReset } from 'lucide-react'
+import { AlertTriangle, BrainCircuit, Inbox, LayoutDashboard, RotateCcw, Settings, Sparkles, TimerReset } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'

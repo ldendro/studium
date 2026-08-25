@@ -45,27 +45,25 @@ from studium.index.vector.models import ModelSpaceFilter
 from studium.parsing import parse_concept_note
 from studium.recommend import recommend
 from studium.schemas import (
-    ConceptNoteMetadata,
     ConceptType,
     ContributionStatus,
     EncounterRole,
     LearningEncounter,
     LearningRole,
     NoteVaultStatus,
-    RelationshipConfidence,
     RelationshipMetadata,
     RelationshipStatus,
+    RelationshipType,
     RelationshipVaultStatus,
     ReviewStatus,
     ScaffoldModuleMetadata,
     ScaffoldModuleStatus,
     ScaffoldModuleType,
     SourceMetadata,
-    SourceType,
     default_studium_learning_encounter,
 )
 from studium.serialization import build_concept_note_metadata, serialize_concept_note
-from studium.serialization.concept_id import generate_concept_id, slugify_title
+from studium.serialization.concept_id import slugify_title
 from studium.writes import (
     build_create_note_proposal,
     build_update_note_proposal,
@@ -125,7 +123,8 @@ def propose_create(workspace: WorkspaceContext, intent: CreateIntent) -> CreateP
     if target is not None:
         target_path = str(target["file_path"])
     else:
-        target_path = f"{_concept_directory(workspace)}/{slugify_title(canonical_title).replace('_', '-')}.md"
+        filename = slugify_title(canonical_title).replace("_", "-")
+        target_path = f"{_concept_directory(workspace)}/{filename}.md"
 
     modules = _proposal_modules(intent, raw, concept_type, action)
     relationships = _proposal_relationships(raw)
@@ -289,7 +288,11 @@ def _build_existing_draft(
 
 def build_preview(workspace: WorkspaceContext, draft: GeneratedDraft) -> DraftPreview:
     write = _write_proposal(workspace, draft)
-    before_lines = [] if write.before_content is None else write.before_content.splitlines(keepends=True)
+    before_lines: list[str] = (
+        []
+        if write.before_content is None
+        else write.before_content.splitlines(keepends=True)
+    )
     after_lines = write.after_content.splitlines(keepends=True)
     diff = "".join(
         difflib.unified_diff(
@@ -446,9 +449,12 @@ def _proposal_modules(
                 reason="Recommendation targets an unmet module-level learning intent.",
             )
         ]
-    if action in {"use_existing_concept", "add_learning_encounter", "update_learning_encounter"}:
-        if intent.requested_module_type is None:
-            return []
+    if (
+        action
+        in {"use_existing_concept", "add_learning_encounter", "update_learning_encounter"}
+        and intent.requested_module_type is None
+    ):
+        return []
     modules = recommend_modules(
         concept_type,
         intent=f"{intent.intent} {intent.learning_goal}",
@@ -479,9 +485,9 @@ def _proposal_relationships(raw: dict[str, Any]) -> list[RelationshipProposal]:
         try:
             result.append(
                 RelationshipProposal(
-                    relationship_type=RelationshipMetadata.model_fields[
-                        "relationship_type"
-                    ].annotation(str(item.get("relationship_type"))),
+                    relationship_type=RelationshipType(
+                        str(item.get("relationship_type"))
+                    ),
                     target_title=str(item.get("target_title") or ""),
                     target_id=_optional_string(item.get("target_concept_id")),
                     learning_role=LearningRole(str(item.get("learning_role") or "supporting")),
@@ -561,7 +567,7 @@ def _relationship_metadata(proposal: RelationshipProposal) -> RelationshipMetada
         ),
         learning_role=proposal.learning_role,
         confidence=proposal.confidence,
-        status=RelationshipStatus.PROPOSED,
+        status=RelationshipStatus.AGENT_SUGGESTED,
     )
 
 
@@ -611,7 +617,7 @@ def _concept_type(value: Any, intent: str) -> ConceptType:
 
 def _clean_domains(value: Any, intent: str) -> list[str]:
     raw = cast(list[Any], value) if isinstance(value, list) else []
-    domains = []
+    domains: list[str] = []
     for item in raw:
         normalized = _DOMAIN_SANITIZE.sub("_", str(item).casefold()).strip("_")
         if normalized and normalized not in domains:

@@ -17,6 +17,34 @@ from studium.schemas import (
 )
 
 
+def _empty_module_types() -> list[ScaffoldModuleType]:
+    return []
+
+
+def _empty_modules() -> list[ModuleProposal]:
+    return []
+
+
+def _empty_relationships() -> list[RelationshipProposal]:
+    return []
+
+
+def _empty_matches() -> list[PossibleMatch]:
+    return []
+
+
+def _empty_dicts() -> list[dict[str, Any]]:
+    return []
+
+
+def _empty_dict() -> dict[str, Any]:
+    return {}
+
+
+def _empty_strings() -> list[str]:
+    return []
+
+
 class CreateIntent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -32,8 +60,10 @@ class CreateIntent(BaseModel):
     target_concept_id: str | None = None
     target_module_id: str | None = None
     requested_module_type: ScaffoldModuleType | None = None
-    scaffold_preferences: list[ScaffoldModuleType] = Field(default_factory=list)
-    search_context: dict[str, Any] = Field(default_factory=dict)
+    scaffold_preferences: list[ScaffoldModuleType] = Field(
+        default_factory=_empty_module_types
+    )
+    search_context: dict[str, Any] = Field(default_factory=_empty_dict)
 
     @field_validator("intent")
     @classmethod
@@ -100,18 +130,18 @@ class CreateProposal(BaseModel):
     concept_type: ConceptType
     domains: list[str] = Field(default_factory=list)
     aliases_to_add: list[str] = Field(default_factory=list)
-    modules: list[ModuleProposal] = Field(default_factory=list)
-    relationships: list[RelationshipProposal] = Field(default_factory=list)
+    modules: list[ModuleProposal] = Field(default_factory=_empty_modules)
+    relationships: list[RelationshipProposal] = Field(default_factory=_empty_relationships)
     encounter: EncounterProposal | None = None
-    possible_matches: list[PossibleMatch] = Field(default_factory=list)
-    backlog_candidates: list[dict[str, Any]] = Field(default_factory=list)
-    evidence: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
+    possible_matches: list[PossibleMatch] = Field(default_factory=_empty_matches)
+    backlog_candidates: list[dict[str, Any]] = Field(default_factory=_empty_dicts)
+    evidence: list[str] = Field(default_factory=_empty_strings)
+    warnings: list[str] = Field(default_factory=_empty_strings)
     confidence: str
     reasoning_mode: str
     index_revision: int
     intent: CreateIntent
-    raw_recommendation: dict[str, Any]
+    raw_recommendation: dict[str, Any] = Field(default_factory=_empty_dict)
 
 
 class GeneratedDraft(BaseModel):
@@ -122,8 +152,8 @@ class GeneratedDraft(BaseModel):
     concept_id: str
     target_path: str
     markdown: str
-    selected_modules: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
+    selected_modules: list[str] = Field(default_factory=_empty_strings)
+    warnings: list[str] = Field(default_factory=_empty_strings)
 
 
 class DraftPreview(BaseModel):
@@ -135,8 +165,8 @@ class DraftPreview(BaseModel):
     would_update: bool
     can_commit: bool
     diff: str
-    warnings: list[dict[str, Any]] = Field(default_factory=list)
-    critical_errors: list[dict[str, Any]] = Field(default_factory=list)
+    warnings: list[dict[str, Any]] = Field(default_factory=_empty_dicts)
+    critical_errors: list[dict[str, Any]] = Field(default_factory=_empty_dicts)
 
 
 class DraftCommitResult(BaseModel):

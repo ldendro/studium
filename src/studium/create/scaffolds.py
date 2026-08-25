@@ -190,7 +190,9 @@ def _module_reason(
         return "Directly requested in this learning intent."
     reasons = {
         ScaffoldModuleType.CONCEPTUAL_EXPLANATION: "Builds a mechanism-first explanation.",
-        ScaffoldModuleType.WORKED_EXAMPLE: "Turns abstract understanding into a checkable procedure.",
+        ScaffoldModuleType.WORKED_EXAMPLE: (
+            "Turns abstract understanding into a checkable procedure."
+        ),
         ScaffoldModuleType.CODE_IMPLEMENTATION: "Tests whether the mechanism can be reconstructed.",
         ScaffoldModuleType.IMPLEMENTATION_NOTES: "Captures constraints and practical trade-offs.",
         ScaffoldModuleType.COMPARISON: "Sharpens the boundary between nearby concepts.",

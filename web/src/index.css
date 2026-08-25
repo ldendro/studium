@@ -2845,6 +2845,13 @@ select.input:focus {
   height: 100%;
 }
 
+.editor-loading {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: var(--text-muted);
+}
+
 .editor-preview {
   max-width: 780px;
   height: 100%;

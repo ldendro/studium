@@ -11,4 +11,8 @@ export default defineConfig({
       '/api': 'http://127.0.0.1:8765',
     },
   },
+  build: {
+    // CodeMirror is intentionally isolated behind the Create editor's lazy boundary.
+    chunkSizeWarningLimit: 700,
+  },
 })
