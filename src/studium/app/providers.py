@@ -59,7 +59,7 @@ class LocalHashEmbeddingProvider:
 class ProviderSettings:
     embedding_provider: str = "local_hash"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    llm_provider: str = "local_openai"
+    llm_provider: str = "disabled"
     llm_base_url: str = "http://127.0.0.1:11434/v1"
     llm_model: str = "llama3.2:3b"
     remote_data_allowed: bool = False
