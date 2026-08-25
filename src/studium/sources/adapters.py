@@ -67,12 +67,13 @@ def _extract_pdf(content: bytes) -> tuple[list[ExtractedUnit], dict[str, Any]]:
         text = _normalize_text(text)
         if text:
             units.append(ExtractedUnit(text=text, page=page_number))
-    raw_metadata = reader.metadata or {}
-    metadata = {
-        str(key).lstrip("/"): str(value)
-        for key, value in raw_metadata.items()
-        if value is not None
-    }
+    document_info = reader.metadata
+    metadata: dict[str, Any] = {}
+    if document_info is not None:
+        for field in ("title", "author", "subject", "creator", "producer"):
+            value = getattr(document_info, field, None)
+            if value is not None:
+                metadata[field] = str(value)
     metadata["page_count"] = len(reader.pages)
     return units, metadata
 

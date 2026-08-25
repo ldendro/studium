@@ -98,7 +98,11 @@ def _tail_at_boundary(text: str, length: int) -> str:
         return text
     tail = text[-length:]
     boundary = min(
-        (position for position in (tail.find(". "), tail.find("\n"), tail.find(" ")) if position >= 0),
+        (
+            position
+            for position in (tail.find(". "), tail.find("\n"), tail.find(" "))
+            if position >= 0
+        ),
         default=-1,
     )
     return tail[boundary + 1 :].strip() if boundary >= 0 else tail

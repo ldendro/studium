@@ -12,7 +12,6 @@ import {
   Filter,
   Globe2,
   Highlighter,
-  Layers3,
   LoaderCircle,
   Plus,
   Quote,

@@ -12,7 +12,6 @@ from typing import Any, cast
 from uuid import uuid4
 
 from sqlalchemy import func, select
-from sqlalchemy.dialects.sqlite import insert
 
 from studium.app.database import (
     app_transaction,
@@ -310,10 +309,12 @@ class SourceService:
         source_tokens = set(_tokens(" ".join(hit.text for hit in hits[:5])))
         overlap = len(concept_tokens & source_tokens) / max(1, len(source_tokens))
         source_text = " ".join(hit.text for hit in hits[:5]).casefold()
-        if any(cue in source_text for cue in ("contrary to", "however", "does not imply", "fails when")):
+        contradiction_cues = ("contrary to", "however", "does not imply", "fails when")
+        example_cues = ("for example", "consider ", "suppose ", "case study")
+        if any(cue in source_text for cue in contradiction_cues):
             classification = "qualification_or_contradiction"
             module_type = "misconception_debugging"
-        elif any(cue in source_text for cue in ("for example", "consider ", "suppose ", "case study")):
+        elif any(cue in source_text for cue in example_cues):
             classification = "worked_example"
             module_type = "worked_example"
         elif any(cue in source_text for cue in ("requires", "prerequisite", "before ", "assume ")):
