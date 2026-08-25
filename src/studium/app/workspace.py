@@ -3,20 +3,29 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import logging
+from collections.abc import Generator
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Any, cast
 
 from studium.app.config import AppConfig
-from studium.app.database import create_app_engine, get_setting
+from studium.app.database import (
+    app_transaction,
+    create_app_engine,
+    get_setting,
+    set_setting,
+)
 from studium.app.jobs import JobManager
-from studium.app.migrations import MigrationResult, migrate_app_database
+from studium.app.migrations import MigrationResult, migrate_app_database, utc_now
 from studium.app.providers import (
     ProviderSettings,
     build_embedding_provider,
     build_llm_provider,
     provider_settings_from_mapping,
+    validate_provider_settings,
 )
 from studium.index.config import IndexConfig
 from studium.index.embeddings.protocol import EmbeddingProvider
@@ -34,6 +43,8 @@ from studium.llm.protocol import LLMProvider
 from studium.schemas import WriteProposal
 from studium.vault import Vault
 from studium.writes import commit_write_proposal
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,6 +175,36 @@ class WorkspaceContext:
         self.embedding_provider = build_embedding_provider(self.provider_settings)
         self.llm_provider = build_llm_provider(self.provider_settings)
 
+    def update_provider_settings(self, settings: ProviderSettings) -> None:
+        """Validate and atomically activate user-controlled provider routing."""
+
+        settings = validate_provider_settings(settings)
+        embedding_provider = build_embedding_provider(settings)
+        llm_provider = build_llm_provider(settings)
+        payload = json.dumps(asdict(settings), sort_keys=True)
+        with self._lock:
+            with app_transaction(self.app_engine) as connection:
+                set_setting(connection, "providers", payload, updated_at=utc_now())
+            self.provider_settings = settings
+            self.embedding_provider = embedding_provider
+            self.llm_provider = llm_provider
+
+    @contextmanager
+    def maintenance_lock(self) -> Generator[None, None, None]:
+        """Serialize snapshots and maintenance with all Studium note writes."""
+
+        with self._lock:
+            yield
+
+    def rebuild_derived_index(self, *, synchronize: bool = True) -> SyncReport | None:
+        with self._lock:
+            self.index_engine = rebuild_index(
+                self.index_config,
+                existing_engine=self.index_engine,
+            )
+            self.last_sync = None
+            return self.sync(embed=True) if synchronize else None
+
     def close(self) -> None:
         self.jobs.close()
         self.index_engine.dispose()
@@ -174,10 +215,14 @@ class WorkspaceContext:
             raw = get_setting(connection, "providers")
         if raw is None:
             return ProviderSettings()
-        payload = json.loads(raw)
-        if not isinstance(payload, dict):
+        try:
+            payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                return ProviderSettings()
+            return provider_settings_from_mapping(cast(dict[str, Any], payload))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            logger.warning("invalid_provider_settings_ignored")
             return ProviderSettings()
-        return provider_settings_from_mapping(cast(dict[str, Any], payload))
 
 
 class WorkspaceRegistry:

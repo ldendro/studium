@@ -165,9 +165,7 @@ class ReviewService:
         created_at = utc_now()
         findings = self._deterministic_findings(review_id, concept_id, raw)
         review_context = parsed.metadata.model_dump(mode="json")
-        review_context["accepted_learning_profile"] = personalization_context(
-            self.workspace
-        )
+        review_context["accepted_learning_profile"] = personalization_context(self.workspace)
         agent_findings, agent_mode = self._provider_findings(
             review_id,
             concept_id,
@@ -272,9 +270,7 @@ class ReviewService:
             diff=_diff(target_path, before, after),
             can_commit=proposal_can_be_committed(proposal),
             warnings=[item.model_dump(mode="json") for item in proposal.warnings],
-            critical_errors=[
-                item.model_dump(mode="json") for item in proposal.critical_errors
-            ],
+            critical_errors=[item.model_dump(mode="json") for item in proposal.critical_errors],
         )
 
     def decide_finding(
@@ -600,9 +596,7 @@ class ReviewService:
     ) -> tuple[list[ReviewFinding], str]:
         provider = self.workspace.llm_provider
         settings = self.workspace.provider_settings
-        local_endpoint = settings.llm_base_url.startswith(
-            ("http://127.0.0.1", "http://localhost")
-        )
+        local_endpoint = settings.llm_base_url.startswith(("http://127.0.0.1", "http://localhost"))
         if provider is None or (not settings.remote_data_allowed and not local_endpoint):
             return [], "deterministic"
         result = run_reasoning_task(
@@ -679,9 +673,7 @@ class ReviewService:
                     "completed_at": latest.completed_at,
                 }
             ),
-            "open_critical_count": (
-                0 if latest is None else latest.summary.open_critical_count
-            ),
+            "open_critical_count": (0 if latest is None else latest.summary.open_critical_count),
         }
 
     def _finding(self, finding_id: str) -> ReviewFinding:
@@ -724,11 +716,7 @@ class ReviewService:
         *,
         decision_note: str | None,
     ) -> None:
-        resolved = (
-            utc_now()
-            if status in {FindingStatus.RESOLVED, FindingStatus.APPLIED}
-            else None
-        )
+        resolved = utc_now() if status in {FindingStatus.RESOLVED, FindingStatus.APPLIED} else None
         with app_transaction(self.workspace.app_engine) as connection:
             result = connection.execute(
                 review_findings.update()
@@ -791,9 +779,7 @@ class ReviewService:
             readiness=ReviewReadiness(str(row["readiness"])),
             summary=ReviewSummary.model_validate_json(str(row["summary_json"] or "{}")),
             created_at=str(row["created_at"]),
-            completed_at=(
-                None if row.get("completed_at") is None else str(row["completed_at"])
-            ),
+            completed_at=(None if row.get("completed_at") is None else str(row["completed_at"])),
             findings=findings,
         )
 
@@ -891,25 +877,13 @@ def _decode_finding(row: dict[str, Any]) -> ReviewFinding:
         category=FindingCategory(str(row["category"])),
         severity=FindingSeverity(str(row["severity"])),
         message=str(row["message"]),
-        anchor=(
-            None
-            if raw_anchor is None
-            else ReviewAnchor.model_validate_json(str(raw_anchor))
-        ),
-        quoted_text=(
-            None if row.get("quoted_text") is None else str(row["quoted_text"])
-        ),
-        proposed_patch=(
-            None if row.get("proposed_patch") is None else str(row["proposed_patch"])
-        ),
+        anchor=(None if raw_anchor is None else ReviewAnchor.model_validate_json(str(raw_anchor))),
+        quoted_text=(None if row.get("quoted_text") is None else str(row["quoted_text"])),
+        proposed_patch=(None if row.get("proposed_patch") is None else str(row["proposed_patch"])),
         status=FindingStatus(str(row["status"])),
-        decision_note=(
-            None if row.get("decision_note") is None else str(row["decision_note"])
-        ),
+        decision_note=(None if row.get("decision_note") is None else str(row["decision_note"])),
         created_at=str(row["created_at"]),
-        resolved_at=(
-            None if row.get("resolved_at") is None else str(row["resolved_at"])
-        ),
+        resolved_at=(None if row.get("resolved_at") is None else str(row["resolved_at"])),
     )
 
 
@@ -949,22 +923,12 @@ def _summary(
         for item in findings
         if item.severity == FindingSeverity.RECOMMENDED and item.status in active
     ]
-    missing = [
-        item.message
-        for item in open_critical
-        if item.category == FindingCategory.COVERAGE
-    ]
+    missing = [item.message for item in open_critical if item.category == FindingCategory.COVERAGE]
     blockers = [item.message for item in open_critical]
     return ReviewSummary(
-        critical_count=sum(
-            item.severity == FindingSeverity.CRITICAL for item in findings
-        ),
-        recommended_count=sum(
-            item.severity == FindingSeverity.RECOMMENDED for item in findings
-        ),
-        optional_count=sum(
-            item.severity == FindingSeverity.OPTIONAL for item in findings
-        ),
+        critical_count=sum(item.severity == FindingSeverity.CRITICAL for item in findings),
+        recommended_count=sum(item.severity == FindingSeverity.RECOMMENDED for item in findings),
+        optional_count=sum(item.severity == FindingSeverity.OPTIONAL for item in findings),
         open_critical_count=len(open_critical),
         open_recommended_count=len(open_recommended),
         missing_essential_modules=missing,
@@ -1044,4 +1008,3 @@ def _deduplicate_findings(findings: list[ReviewFinding]) -> list[ReviewFinding]:
         seen.add(key)
         result.append(finding)
     return result
-

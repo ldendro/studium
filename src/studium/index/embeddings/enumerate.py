@@ -80,9 +80,7 @@ def enumerate_embedding_work(engine: Engine) -> list[EmbeddingWorkRequest]:
                     connection, module_id
                 )
                 module_body = (
-                    ""
-                    if search_document is None
-                    else str(search_document["document_text"])
+                    "" if search_document is None else str(search_document["document_text"])
                 )
                 module_text = build_module_embedding_input(
                     title=str(module["title"]),

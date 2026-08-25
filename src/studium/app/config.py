@@ -47,11 +47,16 @@ class AppConfig:
     def exports_dir(self) -> Path:
         return self.workspace_dir / "exports"
 
+    @property
+    def logs_dir(self) -> Path:
+        return self.resolved_app_data_dir / "logs"
+
     def ensure_directories(self) -> None:
         for directory in (
             self.workspace_dir,
             self.source_assets_dir,
             self.backups_dir,
             self.exports_dir,
+            self.logs_dir,
         ):
             directory.mkdir(parents=True, exist_ok=True)

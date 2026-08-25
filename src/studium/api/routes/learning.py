@@ -179,10 +179,14 @@ def update_backlog(
     workspace: WorkspaceDep,
 ) -> dict[str, Any]:
     try:
-        return BacklogService(workspace).update(
-            item_id,
-            **payload.model_dump(),
-        ).model_dump(mode="json")
+        return (
+            BacklogService(workspace)
+            .update(
+                item_id,
+                **payload.model_dump(),
+            )
+            .model_dump(mode="json")
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Backlog item not found.") from exc
     except ValueError as exc:
@@ -204,10 +208,14 @@ def confirm_backlog_resolution(
     workspace: WorkspaceDep,
 ) -> dict[str, Any]:
     try:
-        return BacklogService(workspace).confirm_resolution(
-            item_id,
-            payload.concept_id,
-        ).model_dump(mode="json")
+        return (
+            BacklogService(workspace)
+            .confirm_resolution(
+                item_id,
+                payload.concept_id,
+            )
+            .model_dump(mode="json")
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Backlog item not found.") from exc
     except ValueError as exc:
@@ -368,4 +376,3 @@ def infer_profile(workspace: WorkspaceDep) -> dict[str, Any]:
 @router.get("/api/profile/soul")
 def soul(workspace: WorkspaceDep) -> dict[str, Any]:
     return ProfileService(workspace).write_soul()
-

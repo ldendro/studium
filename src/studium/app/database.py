@@ -30,7 +30,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import Connection, Engine
 
-APP_SCHEMA_VERSION = 2
+APP_SCHEMA_VERSION = 3
 
 metadata = MetaData()
 
@@ -314,6 +314,8 @@ jobs = Table(
     Column("payload_json", Text, nullable=False, default="{}"),
     Column("result_json", Text),
     Column("error", Text),
+    Column("attempt", Integer, nullable=False, default=1),
+    Column("retry_of_id", String(64)),
     Column("created_at", String(32), nullable=False),
     Column("started_at", String(32)),
     Column("finished_at", String(32)),
@@ -356,3 +358,19 @@ def row_dict(row: Any) -> dict[str, Any]:
 def get_setting(connection: Connection, key: str) -> str | None:
     row = connection.execute(select(settings.c.value_json).where(settings.c.key == key)).first()
     return None if row is None else str(row.value_json)
+
+
+def set_setting(connection: Connection, key: str, value_json: str, *, updated_at: str) -> None:
+    result = connection.execute(
+        settings.update()
+        .where(settings.c.key == key)
+        .values(value_json=value_json, updated_at=updated_at)
+    )
+    if result.rowcount == 0:
+        connection.execute(
+            settings.insert().values(
+                key=key,
+                value_json=value_json,
+                updated_at=updated_at,
+            )
+        )

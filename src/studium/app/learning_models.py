@@ -171,4 +171,3 @@ class ProfileObservation(BaseModel):
     source: str
     created_at: str
     updated_at: str
-

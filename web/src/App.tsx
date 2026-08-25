@@ -1,11 +1,10 @@
-import { AlertTriangle, BrainCircuit, RotateCcw, Settings } from 'lucide-react'
+import { AlertTriangle, BrainCircuit, RotateCcw } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { useWorkspace } from './components/workspace-context'
 import { Button } from './components/ui'
 import { OnboardingPage } from './pages/OnboardingPage'
-import { PlaceholderPage } from './pages/PlaceholderPage'
 
 const SearchPage = lazy(() =>
   import('./pages/SearchPage').then((module) => ({ default: module.SearchPage })),
@@ -27,6 +26,9 @@ const MasteryPage = lazy(() =>
 )
 const ProfilePage = lazy(() =>
   import('./pages/ProfilePage').then((module) => ({ default: module.ProfilePage })),
+)
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })),
 )
 
 function App() {
@@ -121,13 +123,9 @@ function App() {
         <Route
           path="/settings"
           element={
-            <PlaceholderPage
-              eyebrow="Local control"
-              title="Know where your data lives and which models see it."
-              description="Configure vault, providers, privacy, exports, and recovery."
-            >
-              <Settings size={26} />
-            </PlaceholderPage>
+            <Suspense fallback={<div className="page"><div className="boot-screen__line" /></div>}>
+              <SettingsPage />
+            </Suspense>
           }
         />
         <Route path="*" element={<Navigate to="/search" replace />} />

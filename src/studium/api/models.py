@@ -29,6 +29,12 @@ class OpenWorkspaceRequest(BaseModel):
         return None if self.app_data_path is None else Path(self.app_data_path).expanduser()
 
 
+class CreateWorkspaceRequest(OpenWorkspaceRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    demo: bool = False
+
+
 class SyncRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

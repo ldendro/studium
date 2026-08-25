@@ -42,8 +42,7 @@ def migrate_app_database(engine: Engine, config: AppConfig) -> MigrationResult:
     before = current_schema_version(engine)
     if before > APP_SCHEMA_VERSION:
         raise AppSchemaTooNewError(
-            f"Application data schema {before} is newer than supported schema "
-            f"{APP_SCHEMA_VERSION}."
+            f"Application data schema {before} is newer than supported schema {APP_SCHEMA_VERSION}."
         )
 
     applied: list[int] = []
@@ -56,6 +55,10 @@ def migrate_app_database(engine: Engine, config: AppConfig) -> MigrationResult:
         _migration_2(engine)
         version = 2
         applied.append(2)
+    if version < 3:
+        _migration_3(engine)
+        version = 3
+        applied.append(3)
 
     return MigrationResult(before=before, after=version, applied=tuple(applied))
 
@@ -86,6 +89,17 @@ def _migration_2(engine: Engine) -> None:
                 "ALTER TABLE draft_snapshots "
                 "ADD COLUMN operation VARCHAR(24) NOT NULL DEFAULT 'create'"
             )
-        connection.execute(
-            app_metadata.update().values(schema_version=2, updated_at=now)
-        )
+        connection.execute(app_metadata.update().values(schema_version=2, updated_at=now))
+
+
+def _migration_3(engine: Engine) -> None:
+    columns = {column["name"] for column in inspect(engine).get_columns("jobs")}
+    now = utc_now()
+    with app_transaction(engine) as connection:
+        if "attempt" not in columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE jobs ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1"
+            )
+        if "retry_of_id" not in columns:
+            connection.exec_driver_sql("ALTER TABLE jobs ADD COLUMN retry_of_id VARCHAR(64)")
+        connection.execute(app_metadata.update().values(schema_version=3, updated_at=now))

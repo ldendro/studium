@@ -76,9 +76,7 @@ class BacklogService:
             100,
             max(
                 0,
-                priority
-                + min(20, len(required) * 5)
-                + self._personalization_boost(clean_title),
+                priority + min(20, len(required) * 5) + self._personalization_boost(clean_title),
             ),
         )
         now = utc_now()
@@ -117,9 +115,7 @@ class BacklogService:
                     reason=str(candidate.get("reason") or "Recommended during Create."),
                     origin=_backlog_origin(candidate.get("origin") or "create"),
                     priority=int(candidate.get("priority") or 60),
-                    related_concept_id=_optional_string(
-                        candidate.get("related_concept_id")
-                    ),
+                    related_concept_id=_optional_string(candidate.get("related_concept_id")),
                     required_by=_string_list(candidate.get("required_by")),
                     metadata={"candidate": candidate},
                 )
@@ -179,9 +175,7 @@ class BacklogService:
         if status is not None:
             values["status"] = status.value
             values["completed_at"] = (
-                utc_now()
-                if status in {BacklogStatus.COMPLETED, BacklogStatus.DISMISSED}
-                else None
+                utc_now() if status in {BacklogStatus.COMPLETED, BacklogStatus.DISMISSED} else None
             )
         if priority is not None:
             values["priority"] = min(100, max(0, priority))
@@ -194,9 +188,7 @@ class BacklogService:
             values["title"] = clean
         with app_transaction(self.workspace.app_engine) as connection:
             result = connection.execute(
-                backlog_items.update()
-                .where(backlog_items.c.id == item_id)
-                .values(**values)
+                backlog_items.update().where(backlog_items.c.id == item_id).values(**values)
             )
         if result.rowcount == 0:
             raise KeyError(item_id)
@@ -204,15 +196,15 @@ class BacklogService:
 
     def derive_missing_relationships(self) -> list[BacklogItem]:
         with self.workspace.index_engine.connect() as connection:
-            rows = connection.execute(
-                select(index_relationships).where(
-                    index_relationships.c.vault_status != "found"
+            rows = (
+                connection.execute(
+                    select(index_relationships).where(index_relationships.c.vault_status != "found")
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
             concept_rows = concepts.list_concepts(connection)
-        titles = {
-            str(row["concept_id"]): str(row["canonical_title"]) for row in concept_rows
-        }
+        titles = {str(row["concept_id"]): str(row["canonical_title"]) for row in concept_rows}
         grouped: dict[str, list[str]] = defaultdict(list)
         relationship_types: dict[str, str] = {}
         for row in rows:
@@ -271,9 +263,7 @@ class BacklogService:
     def confirm_resolution(self, item_id: str, concept_id: str | None = None) -> BacklogItem:
         item = self.get(item_id)
         candidate = item.resolution_candidate
-        resolved_id = concept_id or (
-            None if candidate is None else str(candidate["concept_id"])
-        )
+        resolved_id = concept_id or (None if candidate is None else str(candidate["concept_id"]))
         if resolved_id is None:
             raise ValueError("No accepted concept matches this backlog item.")
         concept = self._accepted_concept(resolved_id)
@@ -419,9 +409,7 @@ class RetentionService:
 
     def due(self, *, limit: int = 30) -> list[RetentionCard]:
         cards = self.list_cards(limit=max(limit * 3, 100))
-        return [
-            card for card in cards if card.queue in {"due", "overdue"}
-        ][:limit]
+        return [card for card in cards if card.queue in {"due", "overdue"}][:limit]
 
     def get(self, card_id: str) -> RetentionCard:
         with self.workspace.app_engine.connect() as connection:
@@ -445,9 +433,7 @@ class RetentionService:
             values["pinned"] = pinned
         if suspended is not None:
             values["state"] = (
-                RetentionCardState.SUSPENDED.value
-                if suspended
-                else RetentionCardState.REVIEW.value
+                RetentionCardState.SUSPENDED.value if suspended else RetentionCardState.REVIEW.value
             )
         if prompt is not None:
             clean = prompt.strip()
@@ -457,9 +443,7 @@ class RetentionService:
             values["prompt_hash"] = _content_hash(clean)
         with app_transaction(self.workspace.app_engine) as connection:
             result = connection.execute(
-                retention_cards.update()
-                .where(retention_cards.c.id == card_id)
-                .values(**values)
+                retention_cards.update().where(retention_cards.c.id == card_id).values(**values)
             )
         if result.rowcount == 0:
             raise KeyError(card_id)
@@ -553,15 +537,9 @@ class RetentionService:
                 select(review_events).order_by(review_events.c.created_at.desc())
             ).all()
         events = [row_dict(row) for row in event_rows]
-        average = (
-            0.0
-            if not events
-            else sum(float(item["score"]) for item in events) / len(events)
-        )
+        average = 0.0 if not events else sum(float(item["score"]) for item in events) / len(events)
         streak_dates = {
-            str(item["created_at"])[:10]
-            for item in events
-            if item.get("created_at") is not None
+            str(item["created_at"])[:10] for item in events if item.get("created_at") is not None
         }
         return {
             "due": sum(card.queue == "due" for card in cards),
@@ -651,9 +629,7 @@ class RetentionService:
             concept_id=str(row["concept_id"]),
             concept_title=str(concept["canonical_title"]),
             module_id=None if row.get("module_id") is None else str(row["module_id"]),
-            module_type=(
-                None if row.get("module_type") is None else str(row["module_type"])
-            ),
+            module_type=(None if row.get("module_type") is None else str(row["module_type"])),
             prompt=str(row["prompt"]),
             expected_components=_json_strings(row["expected_components_json"]),
             state=state,
@@ -664,9 +640,7 @@ class RetentionService:
             difficulty=float(row["difficulty"]),
             stability=float(row["stability"]),
             last_reviewed_at=(
-                None
-                if row.get("last_reviewed_at") is None
-                else str(row["last_reviewed_at"])
+                None if row.get("last_reviewed_at") is None else str(row["last_reviewed_at"])
             ),
             next_review_at=str(row["next_review_at"]),
             pinned=bool(row["pinned"]),
@@ -703,18 +677,12 @@ class RetentionService:
                 select(func.count())
                 .select_from(index_relationships)
                 .where(index_relationships.c.target_id == concept_id)
-                .where(
-                    index_relationships.c.relationship_type
-                    == RelationshipType.DEPENDS_ON.value
-                )
+                .where(index_relationships.c.relationship_type == RelationshipType.DEPENDS_ON.value)
             ).scalar_one()
             prerequisite_rows = connection.execute(
                 select(index_relationships.c.target_title)
                 .where(index_relationships.c.source_concept_id == concept_id)
-                .where(
-                    index_relationships.c.relationship_type
-                    == RelationshipType.DEPENDS_ON.value
-                )
+                .where(index_relationships.c.relationship_type == RelationshipType.DEPENDS_ON.value)
             ).all()
         return int(dependent_count), [str(row.target_title) for row in prerequisite_rows]
 
@@ -759,9 +727,7 @@ class MasteryService:
             "domains": domains_payload,
             "state_counts": dict(state_counts),
             "average_score": (
-                0.0
-                if not records
-                else round(sum(item.score for item in records) / len(records), 3)
+                0.0 if not records else round(sum(item.score for item in records) / len(records), 3)
             ),
             "updated_at": max((item.updated_at for item in records), default=None),
         }
@@ -785,9 +751,7 @@ class MasteryService:
         return {
             "concept": concept_record.model_dump(mode="json"),
             "modules": [
-                item.model_dump(mode="json")
-                for item in records
-                if item.module_id is not None
+                item.model_dump(mode="json") for item in records if item.module_id is not None
             ],
         }
 
@@ -842,18 +806,14 @@ class MasteryService:
         now = utc_now()
         for module in modules:
             module_id = str(module["id"])
-            module_events = [
-                event for event in events if str(event.get("module_id")) == module_id
-            ]
+            module_events = [event for event in events if str(event.get("module_id")) == module_id]
             retention_score = _average_scores(module_events)
             completion = 1.0 if str(module["status"]) == "completed" else 0.35
             evidence_weight = min(1.0, len(module_events) / 3)
             module_score = round(
                 min(
                     1.0,
-                    retention_score * 0.7
-                    + completion * 0.2
-                    + evidence_weight * 0.1,
+                    retention_score * 0.7 + completion * 0.2 + evidence_weight * 0.1,
                 ),
                 3,
             )
@@ -908,16 +868,13 @@ class MasteryService:
                 "lapse_rate": (
                     0.0
                     if not events
-                    else sum(str(event["evaluation"]) == "again" for event in events)
-                    / len(events)
+                    else sum(str(event["evaluation"]) == "again" for event in events) / len(events)
                 ),
             },
             "modules": {
                 "average_score": round(module_score, 3),
                 "count": len(modules),
-                "completed": sum(
-                    str(module["status"]) == "completed" for module in modules
-                ),
+                "completed": sum(str(module["status"]) == "completed" for module in modules),
             },
             "agent_review": {
                 "readiness": None if review_row is None else str(review_row.readiness),
@@ -1058,14 +1015,17 @@ class MasteryService:
         scores: dict[str, float],
     ) -> dict[str, list[dict[str, Any]]]:
         with self.workspace.index_engine.connect() as connection:
-            rows = connection.execute(
-                select(index_relationships)
-                .where(
-                    index_relationships.c.relationship_type
-                    == RelationshipType.DEPENDS_ON.value
+            rows = (
+                connection.execute(
+                    select(index_relationships)
+                    .where(
+                        index_relationships.c.relationship_type == RelationshipType.DEPENDS_ON.value
+                    )
+                    .where(index_relationships.c.target_id.is_not(None))
                 )
-                .where(index_relationships.c.target_id.is_not(None))
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
         result: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for row in rows:
             source = str(row["source_concept_id"])
@@ -1157,9 +1117,7 @@ class ProfileService:
     def get(self, observation_id: str) -> ProfileObservation:
         with self.workspace.app_engine.connect() as connection:
             row = connection.execute(
-                select(profile_observations).where(
-                    profile_observations.c.id == observation_id
-                )
+                select(profile_observations).where(profile_observations.c.id == observation_id)
             ).first()
         if row is None:
             raise KeyError(observation_id)
@@ -1203,10 +1161,7 @@ class ProfileService:
     def infer(self) -> list[ProfileObservation]:
         proposals: list[ProfileObservation] = []
         with self.workspace.app_engine.connect() as connection:
-            event_rows = [
-                row_dict(row)
-                for row in connection.execute(select(review_events)).all()
-            ]
+            event_rows = [row_dict(row) for row in connection.execute(select(review_events)).all()]
         by_concept: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for event in event_rows:
             by_concept[str(event["concept_id"])].append(event)
@@ -1326,10 +1281,7 @@ def personalization_context(workspace: WorkspaceContext) -> list[str]:
     with workspace.app_engine.connect() as connection:
         rows = connection.execute(
             select(profile_observations)
-            .where(
-                profile_observations.c.status
-                == ProfileObservationStatus.ACCEPTED.value
-            )
+            .where(profile_observations.c.status == ProfileObservationStatus.ACCEPTED.value)
             .order_by(
                 profile_observations.c.pinned.desc(),
                 profile_observations.c.confidence.desc(),
@@ -1353,21 +1305,15 @@ def _decode_backlog(
         reason=str(row["reason"]),
         origin=BacklogOrigin(str(row["origin"])),
         related_concept_id=(
-            None
-            if row.get("related_concept_id") is None
-            else str(row["related_concept_id"])
+            None if row.get("related_concept_id") is None else str(row["related_concept_id"])
         ),
         required_by=_json_strings(row.get("required_by_json")),
-        source_query=(
-            None if row.get("source_query") is None else str(row["source_query"])
-        ),
+        source_query=(None if row.get("source_query") is None else str(row["source_query"])),
         metadata=_json_object(row.get("metadata_json")),
         resolution_candidate=resolution_candidate,
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
-        completed_at=(
-            None if row.get("completed_at") is None else str(row["completed_at"])
-        ),
+        completed_at=(None if row.get("completed_at") is None else str(row["completed_at"])),
     )
 
 
@@ -1492,8 +1438,7 @@ def _schedule(
     }[evaluation]
     ease = max(
         1.3,
-        card.ease_factor
-        + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)),
+        card.ease_factor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)),
     )
     if evaluation == RetentionEvaluation.AGAIN:
         interval = 1
@@ -1611,9 +1556,7 @@ def _json_dicts(value: Any) -> list[dict[str, Any]]:
     if not isinstance(loaded, list):
         return []
     return [
-        cast(dict[str, Any], item)
-        for item in cast(list[Any], loaded)
-        if isinstance(item, dict)
+        cast(dict[str, Any], item) for item in cast(list[Any], loaded) if isinstance(item, dict)
     ]
 
 
@@ -1642,4 +1585,3 @@ def _optional_string(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-

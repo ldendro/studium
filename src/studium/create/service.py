@@ -187,14 +187,14 @@ def build_draft(workspace: WorkspaceContext, proposal: CreateProposal) -> Genera
     if proposal.target_concept_id:
         return _build_existing_draft(workspace, proposal)
     selected = [module for module in proposal.modules if module.selected]
-    encounters = [_learning_encounter(proposal.encounter)] if proposal.encounter else [
-        default_studium_learning_encounter()
-    ]
+    encounters = (
+        [_learning_encounter(proposal.encounter)]
+        if proposal.encounter
+        else [default_studium_learning_encounter()]
+    )
     module_metadata = [_module_metadata(module) for module in selected]
     relationships = [
-        _relationship_metadata(item)
-        for item in proposal.relationships
-        if item.selected
+        _relationship_metadata(item) for item in proposal.relationships if item.selected
     ]
     metadata = build_concept_note_metadata(
         proposal.canonical_title,
@@ -297,9 +297,7 @@ def _build_existing_draft(
 def build_preview(workspace: WorkspaceContext, draft: GeneratedDraft) -> DraftPreview:
     write = _write_proposal(workspace, draft)
     before_lines: list[str] = (
-        []
-        if write.before_content is None
-        else write.before_content.splitlines(keepends=True)
+        [] if write.before_content is None else write.before_content.splitlines(keepends=True)
     )
     after_lines = write.after_content.splitlines(keepends=True)
     diff = "".join(
@@ -319,9 +317,7 @@ def build_preview(workspace: WorkspaceContext, draft: GeneratedDraft) -> DraftPr
         can_commit=proposal_can_be_committed(write),
         diff=diff,
         warnings=[issue.model_dump(mode="json") for issue in write.warnings],
-        critical_errors=[
-            issue.model_dump(mode="json") for issue in write.critical_errors
-        ],
+        critical_errors=[issue.model_dump(mode="json") for issue in write.critical_errors],
     )
 
 
@@ -458,8 +454,7 @@ def _proposal_modules(
             )
         ]
     if (
-        action
-        in {"use_existing_concept", "add_learning_encounter", "update_learning_encounter"}
+        action in {"use_existing_concept", "add_learning_encounter", "update_learning_encounter"}
         and intent.requested_module_type is None
     ):
         return []
@@ -467,8 +462,7 @@ def _proposal_modules(
         concept_type,
         intent=f"{intent.intent} {intent.learning_goal}",
         requested=(
-            intent.requested_module_type
-            or _optional_module_type(raw.get("suggested_module_type"))
+            intent.requested_module_type or _optional_module_type(raw.get("suggested_module_type"))
         ),
         preferences=intent.scaffold_preferences,
     )
@@ -493,9 +487,7 @@ def _proposal_relationships(raw: dict[str, Any]) -> list[RelationshipProposal]:
         try:
             result.append(
                 RelationshipProposal(
-                    relationship_type=RelationshipType(
-                        str(item.get("relationship_type"))
-                    ),
+                    relationship_type=RelationshipType(str(item.get("relationship_type"))),
                     target_title=str(item.get("target_title") or ""),
                     target_id=_optional_string(item.get("target_concept_id")),
                     learning_role=LearningRole(str(item.get("learning_role") or "supporting")),
@@ -569,9 +561,7 @@ def _relationship_metadata(proposal: RelationshipProposal) -> RelationshipMetada
         target_id=proposal.target_id,
         target_title=proposal.target_title,
         vault_status=(
-            RelationshipVaultStatus.FOUND
-            if proposal.target_id
-            else RelationshipVaultStatus.MISSING
+            RelationshipVaultStatus.FOUND if proposal.target_id else RelationshipVaultStatus.MISSING
         ),
         learning_role=proposal.learning_role,
         confidence=proposal.confidence,
@@ -598,9 +588,7 @@ def _concept_directory(workspace: WorkspaceContext) -> str:
     with workspace.index_engine.connect() as connection:
         rows = concepts.list_concepts(connection)
     parents = Counter(
-        str(row["file_path"]).rsplit("/", 1)[0]
-        for row in rows
-        if "/" in str(row["file_path"])
+        str(row["file_path"]).rsplit("/", 1)[0] for row in rows if "/" in str(row["file_path"])
     )
     return parents.most_common(1)[0][0] if parents else "concepts"
 
@@ -640,9 +628,7 @@ def _clean_domains(value: Any, intent: str) -> list[str]:
         "software_engineering": ("python", "code", "architecture", "testing"),
     }
     return [
-        domain
-        for domain, tokens in heuristics.items()
-        if any(token in lower for token in tokens)
+        domain for domain, tokens in heuristics.items() if any(token in lower for token in tokens)
     ] or ["general"]
 
 
@@ -665,11 +651,7 @@ def _optional_string(value: Any) -> str | None:
 def _dict_list(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [
-        cast(dict[str, Any], item)
-        for item in cast(list[Any], value)
-        if isinstance(item, dict)
-    ]
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
 
 
 def _candidate_evidence(candidate: dict[str, Any]) -> list[str]:
@@ -681,9 +663,7 @@ def _candidate_evidence(candidate: dict[str, Any]) -> list[str]:
     if isinstance(modules, list):
         for module in cast(list[Any], modules)[:2]:
             if isinstance(module, dict):
-                evidence.append(
-                    f"module: {cast(dict[str, Any], module).get('title', 'match')}"
-                )
+                evidence.append(f"module: {cast(dict[str, Any], module).get('title', 'match')}")
     return evidence or ["hybrid retrieval candidate"]
 
 

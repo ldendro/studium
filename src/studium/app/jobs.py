@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Lock
@@ -16,6 +17,7 @@ from studium.app.migrations import utc_now
 
 ProgressCallback = Callable[[float, str | None], None]
 JobFunction = Callable[[ProgressCallback], dict[str, Any] | None]
+logger = logging.getLogger(__name__)
 
 
 class JobManager:
@@ -33,9 +35,15 @@ class JobManager:
         job_type: str,
         payload: dict[str, Any],
         function: JobFunction,
+        *,
+        retry_of_id: str | None = None,
     ) -> dict[str, Any]:
         job_id = f"job_{uuid4().hex}"
         now = utc_now()
+        attempt = 1
+        if retry_of_id is not None:
+            previous = self.get(retry_of_id)
+            attempt = int(previous.get("attempt") or 1) + 1
         with app_transaction(self._engine) as connection:
             connection.execute(
                 jobs.insert().values(
@@ -44,12 +52,18 @@ class JobManager:
                     status="queued",
                     progress=0.0,
                     payload_json=json.dumps(payload, sort_keys=True),
+                    attempt=attempt,
+                    retry_of_id=retry_of_id,
                     created_at=now,
                 )
             )
         future = self._executor.submit(self._run, job_id, function)
         with self._lock:
             self._futures[job_id] = future
+        logger.info(
+            "background_job_queued",
+            extra={"job_id": job_id, "job_type": job_type, "attempt": attempt},
+        )
         return self.get(job_id)
 
     def _run(self, job_id: str, function: JobFunction) -> dict[str, Any] | None:
@@ -67,6 +81,13 @@ class JobManager:
                 error=f"{type(exc).__name__}: {exc}",
                 finished_at=utc_now(),
             )
+            logger.error(
+                "background_job_failed",
+                extra={
+                    "job_id": job_id,
+                    "exception_type": type(exc).__name__,
+                },
+            )
             raise
         else:
             self._update(
@@ -76,6 +97,7 @@ class JobManager:
                 result_json=json.dumps(result, sort_keys=True, default=str),
                 finished_at=utc_now(),
             )
+            logger.info("background_job_completed", extra={"job_id": job_id})
             return result
 
     def _update(self, job_id: str, **values: Any) -> None:
@@ -102,7 +124,7 @@ class JobManager:
     def _recover_interrupted_jobs(self) -> None:
         now = utc_now()
         with app_transaction(self._engine) as connection:
-            connection.execute(
+            result = connection.execute(
                 jobs.update()
                 .where(jobs.c.status.in_(["queued", "running"]))
                 .values(
@@ -110,6 +132,11 @@ class JobManager:
                     error="The application stopped before this job completed. Retry the operation.",
                     finished_at=now,
                 )
+            )
+        if result.rowcount:
+            logger.warning(
+                "background_jobs_recovered",
+                extra={"recovered_job_count": result.rowcount},
             )
 
 

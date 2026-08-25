@@ -88,12 +88,18 @@ class SourceService:
             raise
         return self.get(source_id), False
 
-    def enqueue_processing(self, source_id: str) -> dict[str, Any]:
+    def enqueue_processing(
+        self,
+        source_id: str,
+        *,
+        retry_of_id: str | None = None,
+    ) -> dict[str, Any]:
         source = self.get(source_id)
         job = self.workspace.jobs.submit(
             "source_processing",
             {"source_id": source_id, "filename": source.get("original_filename")},
             lambda progress: self.process(source_id, progress=progress),
+            retry_of_id=retry_of_id,
         )
         return {"source": source, "job": job}
 
@@ -210,9 +216,9 @@ class SourceService:
                 raise KeyError(source_id)
             source = _decode_source(row_dict(row))
             count = connection.execute(
-                select(func.count()).select_from(source_chunks).where(
-                    source_chunks.c.source_id == source_id
-                )
+                select(func.count())
+                .select_from(source_chunks)
+                .where(source_chunks.c.source_id == source_id)
             ).scalar_one()
             source["chunk_count"] = int(count)
             if include_chunks:
@@ -222,8 +228,7 @@ class SourceService:
                     .order_by(source_chunks.c.ordinal)
                 ).all()
                 source["chunks"] = [
-                    _decode_chunk(row_dict(chunk), include_embedding=False)
-                    for chunk in chunk_rows
+                    _decode_chunk(row_dict(chunk), include_embedding=False) for chunk in chunk_rows
                 ]
         return source
 
@@ -332,9 +337,7 @@ class SourceService:
             "title": _module_title(classification, str(source["title"])),
             "focus": summary,
             "source_id": source_id,
-            "citations": [
-                hit.citation.model_dump(mode="json") for hit in hits[:4]
-            ],
+            "citations": [hit.citation.model_dump(mode="json") for hit in hits[:4]],
         }
         contribution_id = f"contribution_{uuid4().hex}"
         now = utc_now()
@@ -373,15 +376,11 @@ class SourceService:
         source_id: str | None = None,
         concept_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        statement = select(source_contributions).order_by(
-            source_contributions.c.created_at.desc()
-        )
+        statement = select(source_contributions).order_by(source_contributions.c.created_at.desc())
         if source_id:
             statement = statement.where(source_contributions.c.source_id == source_id)
         if concept_id:
-            statement = statement.where(
-                source_contributions.c.concept_id == concept_id
-            )
+            statement = statement.where(source_contributions.c.concept_id == concept_id)
         with self.workspace.app_engine.connect() as connection:
             rows = connection.execute(statement).all()
         return [_decode_contribution(row_dict(row)) for row in rows]
@@ -399,9 +398,7 @@ class SourceService:
             raise KeyError(contribution_id)
         with self.workspace.app_engine.connect() as connection:
             row = connection.execute(
-                select(source_contributions).where(
-                    source_contributions.c.id == contribution_id
-                )
+                select(source_contributions).where(source_contributions.c.id == contribution_id)
             ).first()
         assert row is not None
         return _decode_contribution(row_dict(row))
@@ -449,9 +446,7 @@ def _chunk_row(chunk: SourceChunkModel, created_at: str) -> dict[str, Any]:
         "char_start": chunk.char_start,
         "char_end": chunk.char_end,
         "token_count": chunk.token_count,
-        "embedding_json": (
-            None if chunk.embedding is None else json.dumps(chunk.embedding)
-        ),
+        "embedding_json": (None if chunk.embedding is None else json.dumps(chunk.embedding)),
         "embedding_model": chunk.embedding_model,
         "created_at": created_at,
     }
@@ -476,9 +471,7 @@ def _decode_contribution(row: dict[str, Any]) -> dict[str, Any]:
     value = dict(row)
     value["evidence"] = json.loads(str(value.pop("evidence_json") or "[]"))
     raw_module = value.pop("proposed_module_json", None)
-    value["proposed_module"] = (
-        None if raw_module is None else json.loads(str(raw_module))
-    )
+    value["proposed_module"] = None if raw_module is None else json.loads(str(raw_module))
     return value
 
 
@@ -534,26 +527,16 @@ def _citation(item: dict[str, Any]) -> Citation:
         section=None if item.get("section") is None else str(item["section"]),
         page=None if item.get("page") is None else int(item["page"]),
         timestamp_start=(
-            None
-            if item.get("timestamp_start") is None
-            else float(item["timestamp_start"])
+            None if item.get("timestamp_start") is None else float(item["timestamp_start"])
         ),
-        timestamp_end=(
-            None
-            if item.get("timestamp_end") is None
-            else float(item["timestamp_end"])
-        ),
+        timestamp_end=(None if item.get("timestamp_end") is None else float(item["timestamp_end"])),
     )
 
 
 def _format_time(seconds: float) -> str:
     minutes, remainder = divmod(int(seconds), 60)
     hours, minutes = divmod(minutes, 60)
-    return (
-        f"{hours:d}:{minutes:02d}:{remainder:02d}"
-        if hours
-        else f"{minutes:d}:{remainder:02d}"
-    )
+    return f"{hours:d}:{minutes:02d}:{remainder:02d}" if hours else f"{minutes:d}:{remainder:02d}"
 
 
 def _summary_for(

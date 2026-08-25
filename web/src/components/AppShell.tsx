@@ -100,6 +100,16 @@ export function AppShell() {
     enabled: jobsOpen,
     refetchInterval: jobsOpen ? 2_000 : false,
   })
+  const retryJobMutation = useMutation({
+    mutationFn: (jobId: string) =>
+      api<{ job: Job }>(`/api/jobs/${jobId}/retry`, { method: 'POST' }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      push('Job queued again', { tone: 'success' })
+    },
+    onError: (error: Error) =>
+      push('Job could not be retried', { description: error.message, tone: 'danger' }),
+  })
 
   const submitSearch = () => {
     const trimmed = query.trim()
@@ -234,6 +244,17 @@ export function AppShell() {
                             <Progress value={job.progress} />
                           )}
                           {job.message && <p>{job.message}</p>}
+                          {job.status === 'failed' && job.error && <p className="job-row__error">{job.error}</p>}
+                          {job.retryable && (
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              loading={retryJobMutation.isPending && retryJobMutation.variables === job.id}
+                              onClick={() => retryJobMutation.mutate(job.id)}
+                            >
+                              <RefreshCw size={13} /> Retry
+                            </Button>
+                          )}
                         </div>
                       ))
                     ) : (

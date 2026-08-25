@@ -49,6 +49,70 @@ export interface Job {
   created_at: string
   started_at: string | null
   finished_at: string | null
+  attempt: number
+  retry_of_id: string | null
+  retryable: boolean
+}
+
+export interface VaultInspection {
+  path: string
+  exists: boolean
+  is_directory: boolean
+  markdown_files: number
+  valid_concepts: number
+  invalid_markdown: number
+  ready: boolean
+  message: string
+  imported_files?: number
+  imported_bytes?: number
+}
+
+export interface ProviderConfiguration {
+  embedding_provider: 'local_hash' | 'sentence_transformers'
+  embedding_model: string
+  llm_provider: 'disabled' | 'openai_compatible'
+  llm_base_url: string
+  llm_model: string
+  llm_api_key_env: string
+  remote_data_allowed: boolean
+  route: 'disabled' | 'local' | 'remote' | 'invalid'
+  api_key_configured: boolean
+}
+
+export interface DataLocation {
+  id: string
+  label: string
+  path: string
+  exists: boolean
+  size_bytes: number
+  clearable: boolean
+  confirmation: string | null
+}
+
+export interface ProductArtifact {
+  id: string
+  artifact_type: 'export' | 'backup'
+  kind: 'markdown' | 'sources' | 'complete' | null
+  created_at: string
+  size_bytes: number
+  file_count: number
+  download_url: string
+}
+
+export interface ProductOverview {
+  providers: ProviderConfiguration
+  provider_options: {
+    embedding: Array<ProviderConfiguration['embedding_provider']>
+    llm: Array<ProviderConfiguration['llm_provider']>
+  }
+  locations: DataLocation[]
+  migration: {
+    before: number
+    after: number
+    applied: number[]
+  }
+  exports: ProductArtifact[]
+  backups: ProductArtifact[]
 }
 
 export type NoticeTone = 'neutral' | 'success' | 'warning' | 'danger'

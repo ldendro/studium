@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import math
+import os
 import re
 from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any
+from urllib.parse import urlparse
 
 from studium.index.embeddings.protocol import EmbeddingModelMetadata, EmbeddingProvider
 from studium.llm.openai_compat import OpenAICompatibleProvider
 from studium.llm.protocol import LLMProvider
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
+_ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+EMBEDDING_PROVIDERS = ("local_hash", "sentence_transformers")
+LLM_PROVIDERS = ("disabled", "openai_compatible")
 
 
 class LocalHashEmbeddingProvider:
@@ -62,6 +68,7 @@ class ProviderSettings:
     llm_provider: str = "disabled"
     llm_base_url: str = "http://127.0.0.1:11434/v1"
     llm_model: str = "llama3.2:3b"
+    llm_api_key_env: str = "STUDIUM_LLM_API_KEY"
     remote_data_allowed: bool = False
 
 
@@ -81,13 +88,52 @@ def build_llm_provider(settings: ProviderSettings) -> LLMProvider | None:
     return OpenAICompatibleProvider(
         base_url=settings.llm_base_url,
         model_id=settings.llm_model,
+        api_key=os.environ.get(settings.llm_api_key_env, "ollama"),
     )
 
 
 def provider_settings_from_mapping(values: dict[str, Any]) -> ProviderSettings:
-    allowed = {
-        key: values[key]
-        for key in ProviderSettings.__dataclass_fields__
-        if key in values
-    }
-    return ProviderSettings(**allowed)
+    allowed = {key: values[key] for key in ProviderSettings.__dataclass_fields__ if key in values}
+    return validate_provider_settings(ProviderSettings(**allowed))
+
+
+def validate_provider_settings(settings: ProviderSettings) -> ProviderSettings:
+    if settings.embedding_provider not in EMBEDDING_PROVIDERS:
+        raise ValueError(f"Unsupported embedding provider: {settings.embedding_provider}")
+    if settings.llm_provider not in LLM_PROVIDERS:
+        raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
+    if not settings.embedding_model.strip():
+        raise ValueError("Embedding model must not be empty.")
+    if not settings.llm_model.strip():
+        raise ValueError("LLM model must not be empty.")
+    if not _ENV_NAME_RE.fullmatch(settings.llm_api_key_env.strip()):
+        raise ValueError("API-key environment variable must be an uppercase shell name.")
+    if settings.llm_provider != "disabled":
+        parsed = urlparse(settings.llm_base_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("LLM base URL must be a complete HTTP or HTTPS URL.")
+        if parsed.username or parsed.password:
+            raise ValueError("Do not place credentials in the LLM base URL.")
+        if provider_route(settings.llm_base_url) == "remote" and not settings.remote_data_allowed:
+            raise ValueError(
+                "Remote model routing requires explicit permission to send note content."
+            )
+    return settings
+
+
+def provider_route(base_url: str) -> str:
+    hostname = urlparse(base_url).hostname
+    if hostname is None:
+        return "invalid"
+    normalized = hostname.casefold().rstrip(".")
+    if normalized == "localhost" or normalized.endswith(".localhost"):
+        return "local"
+    try:
+        address = ipaddress.ip_address(normalized)
+    except ValueError:
+        return "remote"
+    return "local" if address.is_loopback else "remote"
+
+
+def api_key_is_configured(settings: ProviderSettings) -> bool:
+    return bool(os.environ.get(settings.llm_api_key_env))

@@ -84,7 +84,7 @@ def module_proposal(
 def render_new_concept_body(title: str, modules: list[ModuleProposal]) -> str:
     selected = [module for module in modules if module.selected]
     index_lines = "\n".join(
-        f"- [{ ' ' if module.selected else 'x' }] [[#{module.title}|{module.title}]] "
+        f"- [{' ' if module.selected else 'x'}] [[#{module.title}|{module.title}]] "
         f"— `{module.type.value}`"
         for module in selected
     )
@@ -151,8 +151,7 @@ def update_module_index(body: str, modules: list[ModuleProposal]) -> str:
     if not selected:
         return body
     lines = "\n".join(
-        f"- [ ] [[#{module.title}|{module.title}]] — `{module.type.value}`"
-        for module in selected
+        f"- [ ] [[#{module.title}|{module.title}]] — `{module.type.value}`" for module in selected
     )
     heading = "## Module Index"
     next_heading = "## Scaffold Modules"

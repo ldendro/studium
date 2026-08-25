@@ -139,10 +139,14 @@ def preview_patch(
     workspace: WorkspaceDep,
 ) -> dict[str, Any]:
     try:
-        return ReviewService(workspace).preview_patch(
-            finding_id,
-            payload.replacement,
-        ).model_dump(mode="json")
+        return (
+            ReviewService(workspace)
+            .preview_patch(
+                finding_id,
+                payload.replacement,
+            )
+            .model_dump(mode="json")
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Review finding not found.") from exc
     except ValueError as exc:
@@ -177,4 +181,3 @@ def decide_finding(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except WriteProposalBlockedError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-

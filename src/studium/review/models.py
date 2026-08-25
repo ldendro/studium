@@ -132,4 +132,3 @@ class AcceptanceGate(BaseModel):
     blockers: list[str] = Field(default_factory=_empty_strings)
     recommendations: list[str] = Field(default_factory=_empty_strings)
     preview_diff: str = ""
-

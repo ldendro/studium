@@ -10,12 +10,17 @@ from pathlib import Path
 import uvicorn
 
 from studium.api import create_app
+from studium.app.logging import configure_content_safe_logging
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
     vault = Path(args.vault).expanduser().resolve() if args.vault else None
     app_data = Path(args.app_data).expanduser().resolve() if args.app_data else None
     frontend = Path(args.frontend).expanduser().resolve() if args.frontend else None
+    log_path = configure_content_safe_logging(
+        app_data_dir=app_data,
+        level=args.log_level,
+    )
     app = create_app(vault_root=vault, app_data_dir=app_data, frontend_dir=frontend)
     url = f"http://{args.host}:{args.port}"
     if args.open_browser:
@@ -23,5 +28,12 @@ def cmd_serve(args: argparse.Namespace) -> int:
     print(f"Studium is running at {url}")
     if vault is not None:
         print(f"Vault: {vault}")
-    uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
+    print(f"Content-safe log: {log_path}")
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        log_level=args.log_level,
+        access_log=False,
+    )
     return 0

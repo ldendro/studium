@@ -60,9 +60,7 @@ class CreateIntent(BaseModel):
     target_concept_id: str | None = None
     target_module_id: str | None = None
     requested_module_type: ScaffoldModuleType | None = None
-    scaffold_preferences: list[ScaffoldModuleType] = Field(
-        default_factory=_empty_module_types
-    )
+    scaffold_preferences: list[ScaffoldModuleType] = Field(default_factory=_empty_module_types)
     search_context: dict[str, Any] = Field(default_factory=_empty_dict)
 
     @field_validator("intent")
