@@ -64,7 +64,6 @@ export function RetentionPage() {
     setRevealed(false)
     setRating(null)
     setResult(null)
-    setStartedAt(Date.now())
   }
   const selectCard = (cardId: string | null) => {
     setSelectedId(cardId)
