@@ -56,13 +56,22 @@ class NoteStatus(StrEnum):
 
 class ReviewStatus(StrEnum):
     NOT_SUBMITTED = "not_submitted"
+    SUBMITTED = "submitted"
     IN_REVIEW = "in_review"
+    REVIEWING = "reviewing"
+    CHANGES_REQUESTED = "changes_requested"
     APPROVED = "approved"
 
 
 class NoteVaultStatus(StrEnum):
     DRAFT = "draft"
     ACCEPTED = "accepted"
+    ARCHIVED = "archived"
+
+
+class GraphVisibility(StrEnum):
+    HIDDEN = "hidden"
+    VISIBLE = "visible"
 
 
 class ScaffoldModuleType(StrEnum):

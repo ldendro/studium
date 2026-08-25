@@ -10,6 +10,11 @@ dependencies = [
     "sqlalchemy>=2",
     "platformdirs>=4",
     "numpy>=2",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.4",
+    "python-multipart>=0.0.32",
+    "pypdf>=6.16.2",
+    "beautifulsoup4>=4.15.0",
 ]
 
 [project.optional-dependencies]
