@@ -25,5 +25,15 @@ coverage.xml
 .ruff_cache/
 .pyright/
 
+# Frontend
+node_modules/
+web/dist/
+web/.vite/
+*.tsbuildinfo
+
+# Local application/demo data
+demo_vault/
+.studium-data/
+
 # OS / editor
 .DS_Store
