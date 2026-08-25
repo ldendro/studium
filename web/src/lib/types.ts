@@ -302,3 +302,78 @@ export interface DraftSnapshot {
   created_at: string
   updated_at: string
 }
+
+export interface SourceRecord {
+  id: string
+  title: string
+  source_type: 'pdf' | 'markdown' | 'text' | 'html' | 'transcript'
+  status: 'queued' | 'extracting' | 'chunking' | 'embedding' | 'ready' | 'failed'
+  original_filename: string
+  asset_path: string
+  mime_type: string | null
+  content_hash: string
+  size_bytes: number
+  page_count: number | null
+  metadata: Record<string, unknown>
+  processing_error: string | null
+  created_at: string
+  updated_at: string
+  chunk_count: number
+  chunks?: SourceChunk[]
+}
+
+export interface SourceChunk {
+  id: string
+  source_id: string
+  ordinal: number
+  text: string
+  section: string | null
+  page: number | null
+  timestamp_start: number | null
+  timestamp_end: number | null
+  char_start: number | null
+  char_end: number | null
+  token_count: number
+}
+
+export interface Citation {
+  source_id: string
+  source_title: string
+  chunk_id: string
+  locator: string
+  quote: string
+  section: string | null
+  page: number | null
+  timestamp_start: number | null
+  timestamp_end: number | null
+}
+
+export interface RetrievalHit {
+  chunk_id: string
+  source_id: string
+  source_title: string
+  text: string
+  score: number
+  semantic_score: number
+  lexical_score: number
+  citation: Citation
+}
+
+export interface SourceContribution {
+  id: string
+  source_id: string
+  concept_id: string
+  classification: string
+  summary: string
+  evidence: Citation[]
+  proposed_module: {
+    type: string
+    title: string
+    focus: string
+    source_id: string
+    citations: Citation[]
+  } | null
+  status: 'proposed' | 'accepted' | 'rejected'
+  created_at?: string
+  updated_at?: string
+}

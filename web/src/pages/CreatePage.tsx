@@ -109,21 +109,25 @@ export function CreatePage() {
   const queryClient = useQueryClient()
   const initialIntent = params.get('intent') ?? ''
   const targetConcept = params.get('concept')
+  const sourceId = params.get('source')
+  const sourceTitle = params.get('sourceTitle')
+  const sourceType = params.get('sourceType')
+  const requestedModule = params.get('moduleType')
   const [view, setView] = useState<CreateView>('new')
   const [step, setStep] = useState<WorkflowStep>('intent')
   const [intent, setIntent] = useState<CreateIntent>(() => ({
     intent: initialIntent,
     learning_goal: '',
     user_context: '',
-    source_type: null,
-    source_title: null,
+    source_type: sourceType,
+    source_title: sourceTitle,
     source_unit: null,
     source_section: null,
     source_link: null,
-    source_id: null,
+    source_id: sourceId,
     target_concept_id: targetConcept,
     target_module_id: null,
-    requested_module_type: null,
+    requested_module_type: requestedModule,
     scaffold_preferences: [],
     search_context: {},
   }))

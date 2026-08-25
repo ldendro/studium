@@ -13,6 +13,9 @@ const SearchPage = lazy(() =>
 const CreatePage = lazy(() =>
   import('./pages/CreatePage').then((module) => ({ default: module.CreatePage })),
 )
+const SourcesPage = lazy(() =>
+  import('./pages/SourcesPage').then((module) => ({ default: module.SourcesPage })),
+)
 
 function App() {
   const { health, loading, error, refresh } = useWorkspace()
@@ -66,13 +69,9 @@ function App() {
         <Route
           path="/sources/*"
           element={
-            <PlaceholderPage
-              eyebrow="Source intelligence"
-              title="Understand what your sources contribute."
-              description="Process material once, retrieve relevant evidence, and keep citations attached."
-            >
-              <Sparkles size={26} />
-            </PlaceholderPage>
+            <Suspense fallback={<div className="page"><div className="boot-screen__line" /></div>}>
+              <SourcesPage />
+            </Suspense>
           }
         />
         <Route
