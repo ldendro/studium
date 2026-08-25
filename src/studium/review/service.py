@@ -107,10 +107,14 @@ class _AgentFinding(BaseModel):
     proposed_patch: str | None = None
 
 
+def _empty_agent_findings() -> list[_AgentFinding]:
+    return []
+
+
 class _AgentReviewOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    findings: list[_AgentFinding] = Field(default_factory=list)
+    findings: list[_AgentFinding] = Field(default_factory=_empty_agent_findings)
 
 
 _AGENT_REVIEW_TASK = TaskDefinition(
@@ -610,7 +614,8 @@ class ReviewService:
         now = utc_now()
         findings: list[ReviewFinding] = []
         for item in output.findings[:4]:
-            quoted = item.quoted_text if item.quoted_text in markdown else None
+            candidate = item.quoted_text
+            quoted = candidate if candidate is not None and candidate in markdown else None
             findings.append(
                 _new_finding(
                     review_id,

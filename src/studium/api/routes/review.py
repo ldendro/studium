@@ -1,8 +1,8 @@
 """Phase 6 Agent Review routes embedded in Create."""
 
-from __future__ import annotations
-
 # pyright: reportUnusedFunction=false
+
+from __future__ import annotations
 
 from typing import Any
 
