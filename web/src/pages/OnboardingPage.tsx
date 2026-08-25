@@ -3,8 +3,8 @@ import { ArrowRight, BookOpenText, CheckCircle2, FolderOpen, LockKeyhole, Sparkl
 import { useState, type FormEvent } from 'react'
 import { api } from '../lib/api'
 import type { WorkspaceHealth } from '../lib/types'
-import { useToast } from '../components/ToastProvider'
-import { useWorkspace } from '../components/WorkspaceProvider'
+import { useToast } from '../components/toast-context'
+import { useWorkspace } from '../components/workspace-context'
 import { Button, Field, Input } from '../components/ui'
 
 export function OnboardingPage() {

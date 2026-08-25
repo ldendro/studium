@@ -25,8 +25,8 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { Job, SyncReport } from '../lib/types'
-import { useToast } from './ToastProvider'
-import { useWorkspace } from './WorkspaceProvider'
+import { useToast } from './toast-context'
+import { useWorkspace } from './workspace-context'
 import { Badge, Button, IconButton, Progress } from './ui'
 
 const primaryNavigation = [

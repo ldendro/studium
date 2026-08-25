@@ -1,13 +1,12 @@
 import { CheckCircle2, Info, TriangleAlert, X, XCircle } from 'lucide-react'
 import {
-  createContext,
   useCallback,
-  useContext,
   useMemo,
   useState,
   type PropsWithChildren,
 } from 'react'
 import type { NoticeTone } from '../lib/types'
+import { ToastContext } from './toast-context'
 
 interface Toast {
   id: number
@@ -15,12 +14,6 @@ interface Toast {
   description?: string
   tone: NoticeTone
 }
-
-interface ToastApi {
-  push: (title: string, options?: { description?: string; tone?: NoticeTone }) => void
-}
-
-const ToastContext = createContext<ToastApi | null>(null)
 
 let nextToastId = 1
 
@@ -83,10 +76,4 @@ export function ToastProvider({ children }: PropsWithChildren) {
       </div>
     </ToastContext.Provider>
   )
-}
-
-export function useToast(): ToastApi {
-  const context = useContext(ToastContext)
-  if (!context) throw new Error('useToast must be used within ToastProvider')
-  return context
 }

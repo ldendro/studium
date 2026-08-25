@@ -1,7 +1,7 @@
 import { AlertTriangle, BrainCircuit, Inbox, LayoutDashboard, PenLine, RotateCcw, Search, Settings, Sparkles, TimerReset } from 'lucide-react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
-import { useWorkspace } from './components/WorkspaceProvider'
+import { useWorkspace } from './components/workspace-context'
 import { Button } from './components/ui'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
