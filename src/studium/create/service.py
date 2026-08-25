@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert
 
 from studium.app.database import app_transaction, draft_snapshots, row_dict
+from studium.app.learning import personalization_context
 from studium.app.migrations import utc_now
 from studium.app.workspace import WorkspaceContext
 from studium.create.models import (
@@ -74,6 +75,8 @@ _DOMAIN_SANITIZE = re.compile(r"[^a-z0-9_]+")
 
 
 def propose_create(workspace: WorkspaceContext, intent: CreateIntent) -> CreateProposal:
+    personal_context = personalization_context(workspace)
+    intent = _personalized_intent(intent, personal_context)
     search_query = ConceptSearchQuery(
         text=intent.intent,
         limits=ConceptSearchLimits(concepts=12, modules=12, channel=50),
@@ -103,6 +106,7 @@ def propose_create(workspace: WorkspaceContext, intent: CreateIntent) -> CreateP
         module_intent=bool(intent.requested_module_type or intent.target_concept_id),
     )
     raw = recommendation.model_dump(mode="json")
+    raw["personalization_context"] = personal_context
     action = str(raw.get("action") or "create_new_concept")
     target_id = intent.target_concept_id or _optional_string(raw.get("target_concept_id"))
     target = _load_concept(workspace, target_id) if target_id else None
@@ -144,6 +148,10 @@ def propose_create(workspace: WorkspaceContext, intent: CreateIntent) -> CreateP
     reasoning_mode = str(raw.get("reasoning_mode") or "fallback")
     evidence = [str(item) for item in cast(list[Any], raw.get("evidence") or [])]
     warnings = [str(item) for item in cast(list[Any], raw.get("warnings") or [])]
+    if personal_context:
+        evidence.append(
+            f"Personalized with {len(personal_context)} accepted learning-profile observation(s)."
+        )
     if action == "request_clarification":
         message = _optional_string(raw.get("clarification_message"))
         if message:
@@ -677,6 +685,24 @@ def _candidate_evidence(candidate: dict[str, Any]) -> list[str]:
                     f"module: {cast(dict[str, Any], module).get('title', 'match')}"
                 )
     return evidence or ["hybrid retrieval candidate"]
+
+
+def _personalized_intent(
+    intent: CreateIntent,
+    statements: list[str],
+) -> CreateIntent:
+    preferences = list(intent.scaffold_preferences)
+    joined = " ".join(statements).casefold()
+    cues = {
+        ScaffoldModuleType.WORKED_EXAMPLE: ("worked example", "concrete example"),
+        ScaffoldModuleType.DERIVATION: ("derivation", "derive"),
+        ScaffoldModuleType.CODE_IMPLEMENTATION: ("implementation", "code practice"),
+        ScaffoldModuleType.MISCONCEPTION_DEBUGGING: ("misconception", "debug mistakes"),
+    }
+    for module_type, phrases in cues.items():
+        if any(phrase in joined for phrase in phrases) and module_type not in preferences:
+            preferences.append(module_type)
+    return intent.model_copy(update={"scaffold_preferences": preferences})
 
 
 def _decode_draft(row: dict[str, Any]) -> dict[str, Any]:

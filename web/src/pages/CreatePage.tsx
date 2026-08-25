@@ -19,6 +19,7 @@ import {
   GitBranch,
   GripVertical,
   Heading2,
+  Inbox,
   Italic,
   Lightbulb,
   Link,
@@ -85,6 +86,8 @@ const MODULE_TYPES = [
 ]
 
 const SOURCE_TYPES = [
+  'self_study',
+  'backlog',
   'book',
   'paper',
   'article',
@@ -113,6 +116,8 @@ export function CreatePage() {
   const sourceId = params.get('source')
   const sourceTitle = params.get('sourceTitle')
   const sourceType = params.get('sourceType')
+  const sourceUnit = params.get('sourceUnit')
+  const initialContext = params.get('context') ?? ''
   const requestedModule = params.get('moduleType')
   const requestedView = params.get('view')
   const [view, setView] = useState<CreateView>(
@@ -122,10 +127,10 @@ export function CreatePage() {
   const [intent, setIntent] = useState<CreateIntent>(() => ({
     intent: initialIntent,
     learning_goal: '',
-    user_context: '',
+    user_context: initialContext,
     source_type: sourceType,
     source_title: sourceTitle,
-    source_unit: null,
+    source_unit: sourceUnit,
     source_section: null,
     source_link: null,
     source_id: sourceId,
@@ -216,6 +221,24 @@ export function CreatePage() {
     queryKey: ['create-drafts'],
     queryFn: () => api<{ drafts: DraftSnapshot[] }>('/api/create/drafts'),
     enabled: view === 'drafts',
+  })
+  const backlogMutation = useMutation({
+    mutationFn: (candidates: Array<Record<string, unknown>>) =>
+      api<{ items: Array<Record<string, unknown>> }>('/api/backlog/from-candidates', {
+        method: 'POST',
+        body: {
+          candidates: candidates.map((candidate) => ({ ...candidate, origin: 'create' })),
+        },
+      }),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ['backlog'] })
+      push('Candidates added to Backlog', {
+        description: `${result.items.length} learning step(s) are now prioritized.`,
+        tone: 'success',
+      })
+    },
+    onError: (error: Error) =>
+      push('Backlog handoff failed', { description: error.message, tone: 'danger' }),
   })
 
   const currentDraft = useMemo(
@@ -360,6 +383,8 @@ export function CreatePage() {
               onGenerate={generate}
               loading={draftMutation.isPending}
               onOpenMatch={(id) => navigate(`/search?concept=${encodeURIComponent(id)}&q=${encodeURIComponent(intent.intent)}`)}
+              onSaveBacklog={() => backlogMutation.mutate(proposal.backlog_candidates)}
+              savingBacklog={backlogMutation.isPending}
             />
           )}
           {step === 'editor' && currentDraft && (
@@ -558,6 +583,8 @@ function ProposalStep({
   onGenerate,
   loading,
   onOpenMatch,
+  onSaveBacklog,
+  savingBacklog,
 }: {
   proposal: CreateProposal
   setProposal: React.Dispatch<React.SetStateAction<CreateProposal | null>>
@@ -567,6 +594,8 @@ function ProposalStep({
   onGenerate: () => void
   loading: boolean
   onOpenMatch: (id: string) => void
+  onSaveBacklog: () => void
+  savingBacklog: boolean
 }) {
   const updateModule = (index: number, values: Partial<ModuleProposal>) =>
     setProposal((current) =>
@@ -636,6 +665,25 @@ function ProposalStep({
                   <Badge tone={match.vault_status === 'accepted' ? 'success' : 'warning'}>{match.vault_status ?? 'indexed'}</Badge>
                   <ChevronRight size={15} />
                 </button>
+              ))}
+            </div>
+          </Panel>
+        )}
+
+        {proposal.backlog_candidates.length > 0 && (
+          <Panel className="possible-matches backlog-candidates">
+            <div className="proposal-section-heading">
+              <div><Inbox size={16} /><span><strong>Dependent learning steps</strong><small>Approve these separately; they never become note metadata.</small></span></div>
+              <Button variant="secondary" size="small" loading={savingBacklog} onClick={onSaveBacklog}>
+                Send all to Backlog
+              </Button>
+            </div>
+            <div className="backlog-candidate-list">
+              {proposal.backlog_candidates.map((candidate, index) => (
+                <div key={`${String(candidate.title ?? 'candidate')}:${index}`}>
+                  <span><strong>{String(candidate.title ?? 'Learning candidate')}</strong><small>{String(candidate.reason ?? 'Recommended prerequisite or follow-up.')}</small></span>
+                  <Badge tone="warning">{String(candidate.priority ?? 'recommended')}</Badge>
+                </div>
               ))}
             </div>
           </Panel>

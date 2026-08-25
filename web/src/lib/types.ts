@@ -176,6 +176,9 @@ export interface GraphNode {
   vault_status: string
   review_status: string
   selected: boolean
+  mastery_score?: number | null
+  mastery_state?: 'unassessed' | 'fragile' | 'developing' | 'strong'
+  retention_due_count?: number
 }
 
 export interface GraphEdge {
@@ -399,6 +402,107 @@ export interface PatchPreview {
   can_commit: boolean
   warnings: Array<Record<string, unknown>>
   critical_errors: Array<Record<string, unknown>>
+}
+
+export type BacklogStatus = 'open' | 'in_progress' | 'deferred' | 'completed' | 'dismissed'
+
+export interface BacklogItem {
+  id: string
+  title: string
+  item_type: 'new_concept' | 'missing_prerequisite' | 'concept_expansion' | 'open_question'
+  status: BacklogStatus
+  priority: number
+  reason: string
+  origin: 'search' | 'create' | 'graph' | 'review' | 'retention' | 'manual'
+  related_concept_id: string | null
+  required_by: string[]
+  source_query: string | null
+  metadata: Record<string, unknown>
+  resolution_candidate: { concept_id: string; title: string } | null
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
+
+export interface RetentionCard {
+  id: string
+  concept_id: string
+  concept_title: string
+  module_id: string | null
+  module_type: string | null
+  prompt: string
+  expected_components: string[]
+  state: 'new' | 'learning' | 'review' | 'relearning' | 'suspended'
+  interval_days: number
+  ease_factor: number
+  repetitions: number
+  lapses: number
+  difficulty: number
+  stability: number
+  last_reviewed_at: string | null
+  next_review_at: string
+  pinned: boolean
+  queue: 'due' | 'overdue' | 'upcoming' | 'suspended'
+  priority_score: number
+  prerequisite_context: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface RetentionReviewResult {
+  event_id: string
+  card: RetentionCard
+  evaluation: 'again' | 'hard' | 'good' | 'easy'
+  score: number
+  expected_components: string[]
+  feedback: string[]
+  next_interval_days: number
+}
+
+export interface MasteryRecord {
+  concept_id: string
+  concept_title: string
+  module_id: string | null
+  module_title: string | null
+  score: number
+  state: 'unassessed' | 'fragile' | 'developing' | 'strong'
+  signals: Record<string, unknown>
+  trend: Array<{ score: number; state: string; created_at: string }>
+  domains: string[]
+  weak_prerequisites: Array<{
+    concept_id: string
+    title: string
+    score: number
+    reason: string
+  }>
+  recommendations: string[]
+  updated_at: string
+}
+
+export interface MasterySummary {
+  concepts: MasteryRecord[]
+  domains: Array<{
+    domain: string
+    score: number
+    state: MasteryRecord['state']
+    concept_count: number
+  }>
+  state_counts: Record<string, number>
+  average_score: number
+  updated_at: string | null
+}
+
+export interface ProfileObservation {
+  id: string
+  category: 'goal' | 'active_context' | 'learning_preference' | 'strength' | 'gap' | 'topic_priority'
+  statement: string
+  evidence: Array<Record<string, unknown>>
+  confidence: number
+  status: 'proposed' | 'accepted' | 'rejected' | 'disabled'
+  pinned: boolean
+  source: string
+  created_at: string
+  updated_at: string
 }
 
 export interface SourceRecord {

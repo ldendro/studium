@@ -7,9 +7,11 @@ import { IconButton } from './ui'
 export function KnowledgeGraph({
   graph,
   onSelect,
+  mode = 'knowledge',
 }: {
   graph: GraphProjection
   onSelect: (conceptId: string) => void
+  mode?: 'knowledge' | 'mastery'
 }) {
   const container = useRef<HTMLDivElement>(null)
   const core = useRef<Core | null>(null)
@@ -27,8 +29,14 @@ export function KnowledgeGraph({
             conceptType: node.concept_type,
             domain: node.domains[0] ?? 'general',
             selected: node.selected,
+            masteryState: node.mastery_state ?? 'unassessed',
+            masteryScore: node.mastery_score ?? 0,
+            retentionDue: node.retention_due_count ?? 0,
           },
-          classes: node.selected ? 'center' : '',
+          classes: [
+            node.selected ? 'center' : '',
+            mode === 'mastery' ? `mastery-${node.mastery_state ?? 'unassessed'}` : '',
+          ].filter(Boolean).join(' '),
         })),
         ...graph.edges.map((edge) => ({
           data: {
@@ -74,6 +82,34 @@ export function KnowledgeGraph({
           },
         },
         {
+          selector: 'node.mastery-strong',
+          style: {
+            'background-color': '#72bb9a',
+            'border-color': 'rgba(114,187,154,.18)',
+          },
+        },
+        {
+          selector: 'node.mastery-developing',
+          style: {
+            'background-color': '#78a8d4',
+            'border-color': 'rgba(120,168,212,.18)',
+          },
+        },
+        {
+          selector: 'node.mastery-fragile',
+          style: {
+            'background-color': '#df9d67',
+            'border-color': 'rgba(223,157,103,.18)',
+          },
+        },
+        {
+          selector: 'node.mastery-unassessed',
+          style: {
+            'background-color': '#566477',
+            'border-color': 'rgba(86,100,119,.18)',
+          },
+        },
+        {
           selector: 'node:active',
           style: {
             'overlay-color': '#deb66a',
@@ -112,15 +148,23 @@ export function KnowledgeGraph({
           style: { 'line-style': 'dashed', 'line-color': '#df9d67' },
         },
       ],
-      layout: {
-        name: graph.center ? 'cose' : 'cose',
-        animate: false,
-        idealEdgeLength: graph.center ? 110 : 80,
-        nodeOverlap: 14,
-        gravity: 0.8,
-        padding: 34,
-        randomize: true,
-      },
+      layout: mode === 'mastery'
+        ? {
+            name: 'breadthfirst',
+            animate: false,
+            directed: true,
+            spacingFactor: 1.25,
+            padding: 34,
+          }
+        : {
+            name: 'cose',
+            animate: false,
+            idealEdgeLength: graph.center ? 110 : 80,
+            nodeOverlap: 14,
+            gravity: 0.8,
+            padding: 34,
+            randomize: true,
+          },
       minZoom: 0.25,
       maxZoom: 2.2,
       wheelSensitivity: 0.25,
@@ -137,7 +181,7 @@ export function KnowledgeGraph({
       instance.destroy()
       core.current = null
     }
-  }, [graph, onSelect])
+  }, [graph, mode, onSelect])
 
   return (
     <div className="knowledge-graph">

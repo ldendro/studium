@@ -1,4 +1,4 @@
-import { AlertTriangle, BrainCircuit, Inbox, LayoutDashboard, RotateCcw, Settings, Sparkles, TimerReset } from 'lucide-react'
+import { AlertTriangle, BrainCircuit, RotateCcw, Settings } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
@@ -15,6 +15,18 @@ const CreatePage = lazy(() =>
 )
 const SourcesPage = lazy(() =>
   import('./pages/SourcesPage').then((module) => ({ default: module.SourcesPage })),
+)
+const BacklogPage = lazy(() =>
+  import('./pages/BacklogPage').then((module) => ({ default: module.BacklogPage })),
+)
+const RetentionPage = lazy(() =>
+  import('./pages/RetentionPage').then((module) => ({ default: module.RetentionPage })),
+)
+const MasteryPage = lazy(() =>
+  import('./pages/MasteryPage').then((module) => ({ default: module.MasteryPage })),
+)
+const ProfilePage = lazy(() =>
+  import('./pages/ProfilePage').then((module) => ({ default: module.ProfilePage })),
 )
 
 function App() {
@@ -77,49 +89,33 @@ function App() {
         <Route
           path="/backlog"
           element={
-            <PlaceholderPage
-              eyebrow="Learning work"
-              title="Keep the next useful learning step visible."
-              description="Prioritize missing prerequisites, open questions, and concept expansions."
-            >
-              <Inbox size={26} />
-            </PlaceholderPage>
+            <Suspense fallback={<div className="page"><div className="boot-screen__line" /></div>}>
+              <BacklogPage />
+            </Suspense>
           }
         />
         <Route
           path="/retention"
           element={
-            <PlaceholderPage
-              eyebrow="Active recall"
-              title="Review the weak slice, not the entire note."
-              description="Focused prompts adapt to concepts, modules, and prerequisite strength."
-            >
-              <TimerReset size={26} />
-            </PlaceholderPage>
+            <Suspense fallback={<div className="page"><div className="boot-screen__line" /></div>}>
+              <RetentionPage />
+            </Suspense>
           }
         />
         <Route
           path="/mastery"
           element={
-            <PlaceholderPage
-              eyebrow="Evidence"
-              title="See what is strong, fragile, and worth doing next."
-              description="Mastery is calculated from observable learning evidence."
-            >
-              <LayoutDashboard size={26} />
-            </PlaceholderPage>
+            <Suspense fallback={<div className="page"><div className="boot-screen__line" /></div>}>
+              <MasteryPage />
+            </Suspense>
           }
         />
         <Route
           path="/profile"
           element={
-            <PlaceholderPage
-              eyebrow="Personal model"
-              title="Make personalization transparent and editable."
-              description="Inspect the evidence behind how Studium adapts to your learning."
-            >
-              <Sparkles size={26} />
-            </PlaceholderPage>
+            <Suspense fallback={<div className="page"><div className="boot-screen__line" /></div>}>
+              <ProfilePage />
+            </Suspense>
           }
         />
         <Route

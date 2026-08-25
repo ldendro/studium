@@ -22,6 +22,7 @@ from studium.app.database import (
     row_dict,
     source_contributions,
 )
+from studium.app.learning import personalization_context
 from studium.app.migrations import utc_now
 from studium.app.workspace import WorkspaceContext
 from studium.index.repositories import concepts
@@ -163,11 +164,15 @@ class ReviewService:
         review_id = f"review_{uuid4().hex}"
         created_at = utc_now()
         findings = self._deterministic_findings(review_id, concept_id, raw)
+        review_context = parsed.metadata.model_dump(mode="json")
+        review_context["accepted_learning_profile"] = personalization_context(
+            self.workspace
+        )
         agent_findings, agent_mode = self._provider_findings(
             review_id,
             concept_id,
             raw,
-            parsed.metadata.model_dump(mode="json"),
+            review_context,
         )
         findings.extend(agent_findings)
         readiness = _readiness(findings)

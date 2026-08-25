@@ -16,6 +16,8 @@ class ConceptType(StrEnum):
 
 class SourceType(StrEnum):
     STUDIUM = "studium"
+    SELF_STUDY = "self_study"
+    BACKLOG = "backlog"
     BOOK = "book"
     VIDEO = "video"
     PAPER = "paper"
@@ -98,6 +100,7 @@ class ScaffoldModuleOrigin(StrEnum):
     USER_REQUESTED = "user_requested"
     SOURCE_SUGGESTED = "source_suggested"
     REVIEW_SUGGESTED = "review_suggested"
+    RETENTION_SUGGESTED = "retention_suggested"
     MANUAL = "manual"
 
 
