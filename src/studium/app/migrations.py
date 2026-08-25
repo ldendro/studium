@@ -52,6 +52,10 @@ def migrate_app_database(engine: Engine, config: AppConfig) -> MigrationResult:
         _migration_1(engine, config)
         version = 1
         applied.append(1)
+    if version < 2:
+        _migration_2(engine)
+        version = 2
+        applied.append(2)
 
     return MigrationResult(before=before, after=version, applied=tuple(applied))
 
@@ -71,3 +75,17 @@ def _migration_1(engine: Engine, config: AppConfig) -> None:
                     updated_at=now,
                 )
             )
+
+
+def _migration_2(engine: Engine) -> None:
+    columns = {column["name"] for column in inspect(engine).get_columns("draft_snapshots")}
+    now = utc_now()
+    with app_transaction(engine) as connection:
+        if "operation" not in columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE draft_snapshots "
+                "ADD COLUMN operation VARCHAR(24) NOT NULL DEFAULT 'create'"
+            )
+        connection.execute(
+            app_metadata.update().values(schema_version=2, updated_at=now)
+        )

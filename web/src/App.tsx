@@ -10,6 +10,9 @@ import { PlaceholderPage } from './pages/PlaceholderPage'
 const SearchPage = lazy(() =>
   import('./pages/SearchPage').then((module) => ({ default: module.SearchPage })),
 )
+const CreatePage = lazy(() =>
+  import('./pages/CreatePage').then((module) => ({ default: module.CreatePage })),
+)
 
 function App() {
   const { health, loading, error, refresh } = useWorkspace()
@@ -55,13 +58,9 @@ function App() {
         <Route
           path="/create/*"
           element={
-            <PlaceholderPage
-              eyebrow="Create"
-              title="Begin with concept intelligence, not a blank page."
-              description="Investigate, scaffold, edit, review, and accept knowledge in one workflow."
-            >
-              <PenLine size={26} />
-            </PlaceholderPage>
+            <Suspense fallback={<div className="page"><div className="boot-screen__line" /></div>}>
+              <CreatePage />
+            </Suspense>
           }
         />
         <Route

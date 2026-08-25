@@ -30,7 +30,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import Connection, Engine
 
-APP_SCHEMA_VERSION = 1
+APP_SCHEMA_VERSION = 2
 
 metadata = MetaData()
 
@@ -123,6 +123,7 @@ draft_snapshots = Table(
     Column("concept_id", String(128)),
     Column("title", Text, nullable=False),
     Column("target_path", Text),
+    Column("operation", String(24), nullable=False, default="create"),
     Column("markdown", Text, nullable=False),
     Column("recommendation_json", Text),
     Column("created_at", String(32), nullable=False),

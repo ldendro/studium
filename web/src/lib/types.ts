@@ -194,3 +194,111 @@ export interface GraphProjection {
   edges: GraphEdge[]
   legend: Record<string, string>
 }
+
+export interface CreateIntent {
+  intent: string
+  learning_goal: string
+  user_context: string
+  source_type: string | null
+  source_title: string | null
+  source_unit: string | null
+  source_section: string | null
+  source_link: string | null
+  source_id: string | null
+  target_concept_id: string | null
+  target_module_id: string | null
+  requested_module_type: string | null
+  scaffold_preferences: string[]
+  search_context: Record<string, unknown>
+}
+
+export interface ModuleProposal {
+  id: string
+  type: string
+  title: string
+  focus: string | null
+  selected: boolean
+  reason: string
+  origin: string
+}
+
+export interface RelationshipProposal {
+  relationship_type: string
+  target_title: string
+  target_id: string | null
+  learning_role: string
+  confidence: string
+  selected: boolean
+  evidence: string
+}
+
+export interface EncounterProposal {
+  source_type: string
+  source_title: string
+  unit: string | null
+  section: string | null
+  link: string | null
+  source_id: string | null
+  selected: boolean
+}
+
+export interface CreateProposal {
+  proposal_id: string
+  action: string
+  canonical_title: string
+  target_concept_id: string | null
+  target_path: string
+  concept_type: string
+  domains: string[]
+  aliases_to_add: string[]
+  modules: ModuleProposal[]
+  relationships: RelationshipProposal[]
+  encounter: EncounterProposal | null
+  possible_matches: Array<{
+    concept_id: string
+    title: string
+    evidence: string[]
+    vault_status: string | null
+  }>
+  backlog_candidates: Array<Record<string, unknown>>
+  evidence: string[]
+  warnings: string[]
+  confidence: string
+  reasoning_mode: string
+  index_revision: number
+  intent: CreateIntent
+  raw_recommendation: Record<string, unknown>
+}
+
+export interface GeneratedDraft {
+  proposal_id: string
+  operation: 'create' | 'update' | 'no_change'
+  concept_id: string
+  target_path: string
+  markdown: string
+  selected_modules: string[]
+  warnings: string[]
+}
+
+export interface DraftPreview {
+  operation: string
+  target_path: string
+  would_create: boolean
+  would_update: boolean
+  can_commit: boolean
+  diff: string
+  warnings: Array<Record<string, unknown>>
+  critical_errors: Array<Record<string, unknown>>
+}
+
+export interface DraftSnapshot {
+  id: string
+  concept_id: string
+  title: string
+  target_path: string
+  operation: 'create' | 'update' | 'no_change'
+  markdown: string
+  recommendation: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}

@@ -8,6 +8,7 @@ from studium.index.repositories import aliases as aliases_repo
 from studium.index.repositories import concepts as concepts_repo
 from studium.index.repositories import domains as domains_repo
 from studium.index.repositories import scaffold_modules as scaffold_modules_repo
+from studium.index.repositories import search_documents as search_documents_repo
 from studium.index.sync.embedding_inputs import (
     build_identity_embedding_input,
     build_module_embedding_input,
@@ -23,8 +24,8 @@ def enumerate_embedding_work(engine: Engine) -> list[EmbeddingWorkRequest]:
     Used for retry, model-change, and missing-row repair when ``sync_vault``
     emits an empty ``embedding_work`` list because vault files are unchanged.
     Input texts are reconstructed from indexed columns (matching B03 builders
-    after alias dedupe; module body is empty until body extraction is stored
-    in the index).
+    after alias dedupe. Module search documents preserve extracted module body
+    text so model changes and repair runs retain content-aware embeddings.
     """
     work: list[EmbeddingWorkRequest] = []
     with engine.connect() as connection:
@@ -75,11 +76,19 @@ def enumerate_embedding_work(engine: Engine) -> list[EmbeddingWorkRequest]:
             for module in scaffold_modules_repo.list_modules_for_concept(connection, concept_id):
                 module_id = str(module["module_id"])
                 focus = module.get("focus")
+                search_document = search_documents_repo.get_module_search_document(
+                    connection, module_id
+                )
+                module_body = (
+                    ""
+                    if search_document is None
+                    else str(search_document["document_text"])
+                )
                 module_text = build_module_embedding_input(
                     title=str(module["title"]),
                     module_type=str(module["type"]),
                     focus=None if focus is None else str(focus),
-                    body="",
+                    body=module_body,
                 )
                 work.append(
                     EmbeddingWorkRequest(
