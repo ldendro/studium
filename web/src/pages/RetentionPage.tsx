@@ -35,7 +35,7 @@ export function RetentionPage() {
   const [revealed, setRevealed] = useState(false)
   const [rating, setRating] = useState<number | null>(null)
   const [confidence, setConfidence] = useState(3)
-  const [startedAt, setStartedAt] = useState(() => Date.now())
+  const [startedAt] = useState(() => Date.now())
   const [result, setResult] = useState<RetentionReviewResult | null>(null)
 
   const statsQuery = useQuery({
