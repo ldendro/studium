@@ -149,10 +149,12 @@ class BacklogService:
         with self.workspace.app_engine.connect() as connection:
             rows = connection.execute(statement).all()
         accepted = self._accepted_titles()
-        return [
-            _decode_backlog(row_dict(row), resolution_candidate=accepted.get(_normalize(str(row.title))))
-            for row in rows
-        ]
+        result: list[BacklogItem] = []
+        for row in rows:
+            value = row_dict(row)
+            candidate = accepted.get(_normalize(str(value["title"])))
+            result.append(_decode_backlog(value, resolution_candidate=candidate))
+        return result
 
     def get(self, item_id: str) -> BacklogItem:
         with self.workspace.app_engine.connect() as connection:

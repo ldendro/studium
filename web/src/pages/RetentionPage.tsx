@@ -16,7 +16,7 @@ import {
   Target,
   TimerReset,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/toast-context'
 import { Badge, Button, EmptyState, PageHeader, Panel, Textarea } from '../components/ui'
@@ -58,16 +58,18 @@ export function RetentionPage() {
   })
   const cards = cardsQuery.data?.cards ?? []
   const selected = cards.find((card) => card.id === selectedId) ?? cards[0] ?? null
-  useEffect(() => {
-    if (selected && selected.id !== selectedId) setSelectedId(selected.id)
-  }, [selected, selectedId])
-  useEffect(() => {
+
+  const resetAttempt = () => {
     setResponse('')
     setRevealed(false)
     setRating(null)
     setResult(null)
     setStartedAt(Date.now())
-  }, [selected?.id])
+  }
+  const selectCard = (cardId: string | null) => {
+    setSelectedId(cardId)
+    resetAttempt()
+  }
 
   const refresh = async () => {
     await Promise.all([
@@ -171,7 +173,7 @@ export function RetentionPage() {
               role="tab"
               aria-selected={queue === value}
               className={queue === value ? 'active' : ''}
-              onClick={() => { setQueue(value); setSelectedId(null) }}
+              onClick={() => { setQueue(value); selectCard(null) }}
             >
               {label(value)} <span>{queueCounts[value]}</span>
             </button>
@@ -200,7 +202,7 @@ export function RetentionPage() {
                   type="button"
                   key={card.id}
                   className={clsx(card.id === selected.id && 'active')}
-                  onClick={() => setSelectedId(card.id)}
+                  onClick={() => selectCard(card.id)}
                 >
                   <span><Layers3 size={14} /></span>
                   <span>
@@ -296,8 +298,7 @@ export function RetentionPage() {
                 {result.feedback.map((item) => <p key={item}>{item}</p>)}
                 <div>
                   <Button variant="primary" onClick={() => {
-                    setSelectedId(cards.find((card) => card.id !== selected.id)?.id ?? null)
-                    setResult(null)
+                    selectCard(cards.find((card) => card.id !== selected.id)?.id ?? null)
                     void refresh()
                   }}>
                     Next card <Play size={13} />
@@ -315,11 +316,7 @@ export function RetentionPage() {
                     </Button>
                   )}
                   <Button variant="ghost" onClick={() => {
-                    setResponse('')
-                    setRevealed(false)
-                    setRating(null)
-                    setResult(null)
-                    setStartedAt(Date.now())
+                    resetAttempt()
                   }}>
                     <RotateCcw size={13} /> Retry
                   </Button>

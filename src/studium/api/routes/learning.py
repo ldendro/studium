@@ -1,10 +1,10 @@
-"""Phases 7–10 ongoing learning system routes."""
+"""Phases 7-10 ongoing learning system routes."""
 
 # pyright: reportUnusedFunction=false
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,6 +25,19 @@ from studium.app.learning_models import (
 )
 
 router = APIRouter(tags=["learning"])
+
+BacklogStatusQuery = Annotated[
+    BacklogStatus | None,
+    Query(alias="status"),
+]
+ProfileStatusQuery = Annotated[
+    ProfileObservationStatus | None,
+    Query(alias="status"),
+]
+
+
+def _empty_evidence() -> list[dict[str, Any]]:
+    return []
 
 
 class BacklogCreateRequest(BaseModel):
@@ -98,7 +111,7 @@ class ObservationCreateRequest(BaseModel):
 
     category: ProfileCategory
     statement: str
-    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    evidence: list[dict[str, Any]] = Field(default_factory=_empty_evidence)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     status: ProfileObservationStatus = ProfileObservationStatus.ACCEPTED
     pinned: bool = False
@@ -118,10 +131,10 @@ class ObservationUpdateRequest(BaseModel):
 @router.get("/api/backlog")
 def list_backlog(
     workspace: WorkspaceDep,
-    status_filter: BacklogStatus | None = Query(default=None, alias="status"),
-    origin: BacklogOrigin | None = Query(default=None),
-    item_type: BacklogItemType | None = Query(default=None),
-    query: str | None = Query(default=None),
+    status_filter: BacklogStatusQuery = None,
+    origin: BacklogOrigin | None = None,
+    item_type: BacklogItemType | None = None,
+    query: str | None = None,
 ) -> dict[str, Any]:
     items = BacklogService(workspace).list(
         status=status_filter,
@@ -310,10 +323,7 @@ def mastery_graph(workspace: WorkspaceDep) -> dict[str, Any]:
 @router.get("/api/profile/observations")
 def observations(
     workspace: WorkspaceDep,
-    status_filter: ProfileObservationStatus | None = Query(
-        default=None,
-        alias="status",
-    ),
+    status_filter: ProfileStatusQuery = None,
 ) -> dict[str, Any]:
     values = ProfileService(workspace).list(status=status_filter)
     return {"observations": [item.model_dump(mode="json") for item in values]}
