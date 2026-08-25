@@ -46,6 +46,7 @@ import {
 } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Markdown } from '../components/Markdown'
+import { ReviewWorkspace } from '../components/ReviewWorkspace'
 import { useToast } from '../components/toast-context'
 import {
   Badge,
@@ -103,7 +104,7 @@ const MarkdownEditor = lazy(() =>
 )
 
 export function CreatePage() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const { push } = useToast()
   const queryClient = useQueryClient()
@@ -113,7 +114,10 @@ export function CreatePage() {
   const sourceTitle = params.get('sourceTitle')
   const sourceType = params.get('sourceType')
   const requestedModule = params.get('moduleType')
-  const [view, setView] = useState<CreateView>('new')
+  const requestedView = params.get('view')
+  const [view, setView] = useState<CreateView>(
+    requestedView === 'drafts' || requestedView === 'review' ? requestedView : 'new',
+  )
   const [step, setStep] = useState<WorkflowStep>('intent')
   const [intent, setIntent] = useState<CreateIntent>(() => ({
     intent: initialIntent,
@@ -144,6 +148,7 @@ export function CreatePage() {
   })
   const [commitResult, setCommitResult] = useState<Record<string, unknown> | null>(null)
   const editorRef = useRef<EditorView | null>(null)
+  const reviewConceptId = params.get('reviewConcept')
 
   const proposeMutation = useMutation({
     mutationFn: (payload: CreateIntent) =>
@@ -284,8 +289,18 @@ export function CreatePage() {
     setMarkdownValue(saved.markdown)
     setSnapshotId(saved.id)
     setLastSaved(saved.updated_at)
-    setView('new')
+    switchView('new')
     setStep('editor')
+  }
+
+  const switchView = (next: CreateView, reviewConcept?: string | null) => {
+    setView(next)
+    const updated = new URLSearchParams(params)
+    if (next === 'new') updated.delete('view')
+    else updated.set('view', next)
+    if (reviewConcept) updated.set('reviewConcept', reviewConcept)
+    else if (next !== 'review') updated.delete('reviewConcept')
+    setParams(updated, { replace: true })
   }
 
   return (
@@ -296,14 +311,14 @@ export function CreatePage() {
         description="Every session investigates your vault first, proposes a learning structure, and shows the exact Markdown change before commit."
         actions={
           <div className="create-view-tabs" role="tablist" aria-label="Create workspace">
-            <button className={view === 'new' ? 'active' : ''} onClick={() => setView('new')} role="tab">
+            <button className={view === 'new' ? 'active' : ''} onClick={() => switchView('new')} role="tab" aria-selected={view === 'new'}>
               <PenLine size={14} /> New
             </button>
-            <button className={view === 'drafts' ? 'active' : ''} onClick={() => setView('drafts')} role="tab">
+            <button className={view === 'drafts' ? 'active' : ''} onClick={() => switchView('drafts')} role="tab" aria-selected={view === 'drafts'}>
               <FileClock size={14} /> Drafts
               {draftsQuery.data?.drafts.length ? <span>{draftsQuery.data.drafts.length}</span> : null}
             </button>
-            <button className={view === 'review' ? 'active' : ''} onClick={() => setView('review')} role="tab">
+            <button className={view === 'review' ? 'active' : ''} onClick={() => switchView('review')} role="tab" aria-selected={view === 'review'}>
               <ShieldCheck size={14} /> Review queue
             </button>
           </div>
@@ -315,10 +330,15 @@ export function CreatePage() {
           drafts={draftsQuery.data?.drafts ?? []}
           loading={draftsQuery.isLoading}
           onRestore={restoreDraft}
-          onNew={() => { setView('new'); reset() }}
+          onNew={() => { switchView('new'); reset() }}
         />
       ) : view === 'review' ? (
-        <ReviewQueuePreview onNew={() => setView('new')} />
+        <ReviewWorkspace
+          selectedConceptId={reviewConceptId}
+          onSelectConcept={(conceptId) => switchView('review', conceptId)}
+          onCreate={() => { switchView('new'); reset() }}
+          onAccepted={(conceptId) => navigate(`/search?concept=${encodeURIComponent(conceptId)}`)}
+        />
       ) : (
         <>
           <WorkflowProgress step={step} />
@@ -371,7 +391,7 @@ export function CreatePage() {
             <DoneStep
               draft={currentDraft}
               result={commitResult}
-              onReview={() => setView('review')}
+              onReview={() => switchView('review', currentDraft.concept_id)}
               onInspect={() => navigate(`/search?concept=${encodeURIComponent(currentDraft.concept_id)}`)}
               onNew={reset}
             />
@@ -1016,17 +1036,6 @@ function DraftLibrary({
       ) : (
         <EmptyState icon={<FileClock size={24} />} title="No autosaved drafts" description="Begin a session and Studium will preserve your editor state locally and on the local service." action={<Button onClick={onNew}>Start creating</Button>} />
       )}
-    </Panel>
-  )
-}
-
-function ReviewQueuePreview({ onNew }: { onNew: () => void }) {
-  return (
-    <Panel className="review-queue-preview">
-      <div><ShieldCheck size={25} /><Badge tone="accent">Integrated workflow</Badge></div>
-      <h2>Draft review belongs here—not in a disconnected tab.</h2>
-      <p>Committed drafts move into structural and conceptual review. Findings, anchored comments, patch decisions, and acceptance all stay attached to the Create workflow.</p>
-      <Button variant="primary" onClick={onNew}>Create a draft to review</Button>
     </Panel>
   )
 }

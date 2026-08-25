@@ -303,6 +303,104 @@ export interface DraftSnapshot {
   updated_at: string
 }
 
+export type ReviewSeverity = 'critical' | 'recommended' | 'optional'
+export type ReviewFindingStatus = 'open' | 'resolved' | 'applied' | 'rejected'
+export type ReviewReadiness =
+  | 'needs_revision'
+  | 'approved_with_suggestions'
+  | 'approved'
+
+export interface ReviewAnchor {
+  target_type: string
+  module_id: string | null
+  heading: string | null
+  start_offset: number | null
+  end_offset: number | null
+  line_start: number | null
+  line_end: number | null
+}
+
+export interface ReviewFinding {
+  id: string
+  review_id: string
+  concept_id: string
+  module_id: string | null
+  category: 'preflight' | 'coverage' | 'conceptual' | 'relationship' | 'source_grounding'
+  severity: ReviewSeverity
+  message: string
+  anchor: ReviewAnchor | null
+  quoted_text: string | null
+  proposed_patch: string | null
+  status: ReviewFindingStatus
+  decision_note: string | null
+  created_at: string
+  resolved_at: string | null
+}
+
+export interface ReviewSummary {
+  critical_count: number
+  recommended_count: number
+  optional_count: number
+  open_critical_count: number
+  open_recommended_count: number
+  missing_essential_modules: string[]
+  content_hash: string
+  agent_mode: string
+  can_accept: boolean
+  blockers: string[]
+}
+
+export interface ReviewSession {
+  id: string
+  concept_id: string
+  file_path: string
+  status: 'queued' | 'running' | 'completed' | 'failed'
+  readiness: ReviewReadiness
+  summary: ReviewSummary
+  created_at: string
+  completed_at: string | null
+  findings: ReviewFinding[]
+}
+
+export interface ReviewQueueItem {
+  concept_id: string
+  canonical_title: string
+  file_path: string
+  concept_type: string
+  status: string
+  review_status: string
+  vault_status: 'draft'
+  updated_at: string | null
+  latest_review: {
+    id: string
+    status: ReviewSession['status']
+    readiness: ReviewReadiness
+    completed_at: string | null
+  } | null
+  open_critical_count: number
+}
+
+export interface AcceptanceGate {
+  concept_id: string
+  review_id: string | null
+  readiness: ReviewReadiness | null
+  can_accept: boolean
+  requires_acknowledgement: boolean
+  blockers: string[]
+  recommendations: string[]
+  preview_diff: string
+}
+
+export interface PatchPreview {
+  finding_id: string
+  target_path: string
+  replacement: string
+  diff: string
+  can_commit: boolean
+  warnings: Array<Record<string, unknown>>
+  critical_errors: Array<Record<string, unknown>>
+}
+
 export interface SourceRecord {
   id: string
   title: string
