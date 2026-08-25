@@ -6,6 +6,7 @@ import hashlib
 import math
 import re
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any
 
 from studium.index.embeddings.protocol import EmbeddingModelMetadata, EmbeddingProvider
@@ -43,7 +44,7 @@ class LocalHashEmbeddingProvider:
 
     def _embed(self, text: str) -> list[float]:
         tokens = _TOKEN_RE.findall(text.casefold())
-        features = [*tokens, *(f"{a}_{b}" for a, b in zip(tokens, tokens[1:], strict=False))]
+        features = [*tokens, *(f"{a}_{b}" for a, b in pairwise(tokens))]
         values = [0.0] * self._dimension
         for feature in features:
             digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=8).digest()

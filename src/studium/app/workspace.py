@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
-from typing import Any
+from typing import Any, cast
 
 from studium.app.config import AppConfig
 from studium.app.database import create_app_engine, get_setting
@@ -177,7 +177,7 @@ class WorkspaceContext:
         payload = json.loads(raw)
         if not isinstance(payload, dict):
             return ProviderSettings()
-        return provider_settings_from_mapping(payload)
+        return provider_settings_from_mapping(cast(dict[str, Any], payload))
 
 
 class WorkspaceRegistry:

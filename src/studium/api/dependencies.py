@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import HTTPException, Request, status
+from typing import Annotated
+
+from fastapi import Depends, HTTPException, Request, status
 
 from studium.app.workspace import WorkspaceContext, WorkspaceRegistry
 
@@ -26,3 +28,7 @@ def get_workspace(request: Request) -> WorkspaceContext:
             status_code=status.HTTP_409_CONFLICT,
             detail="No vault is open. Complete onboarding or open a workspace first.",
         ) from exc
+
+
+WorkspaceDep = Annotated[WorkspaceContext, Depends(get_workspace)]
+RegistryDep = Annotated[WorkspaceRegistry, Depends(get_registry)]

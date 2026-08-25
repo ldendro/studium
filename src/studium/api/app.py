@@ -1,18 +1,20 @@
 """FastAPI application factory for the local Studium service."""
 
+# pyright: reportUnusedFunction=false
+
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
+from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from studium.api.dependencies import get_registry, get_workspace
+from studium.api.dependencies import RegistryDep, WorkspaceDep, get_registry
 from studium.api.models import OpenWorkspaceRequest, SyncRequest
 from studium.app.workspace import WorkspaceContext, WorkspaceRegistry
 
@@ -28,7 +30,7 @@ def create_app(
         registry.open(vault_root, app_data_dir=app_data_dir)
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         yield
         registry.close()
 
@@ -66,14 +68,14 @@ def _system_router() -> APIRouter:
 
     @router.get("/workspace")
     def workspace_status(
-        workspace: WorkspaceContext = Depends(get_workspace),
+        workspace: WorkspaceDep,
     ) -> dict[str, Any]:
         return workspace.health(probe_llm=False)
 
     @router.post("/workspace/open")
     def open_workspace(
         payload: OpenWorkspaceRequest,
-        registry: WorkspaceRegistry = Depends(get_registry),
+        registry: RegistryDep,
     ) -> dict[str, Any]:
         path = payload.vault()
         if not path.exists():
@@ -92,7 +94,7 @@ def _system_router() -> APIRouter:
     @router.post("/index/sync")
     def synchronize(
         payload: SyncRequest,
-        workspace: WorkspaceContext = Depends(get_workspace),
+        workspace: WorkspaceDep,
     ) -> dict[str, Any]:
         if not payload.background:
             report = workspace.sync(embed=payload.embeddings)
@@ -107,14 +109,14 @@ def _system_router() -> APIRouter:
 
     @router.get("/jobs")
     def list_jobs(
-        workspace: WorkspaceContext = Depends(get_workspace),
+        workspace: WorkspaceDep,
     ) -> dict[str, Any]:
         return {"jobs": workspace.jobs.list()}
 
     @router.get("/jobs/{job_id}")
     def get_job(
         job_id: str,
-        workspace: WorkspaceContext = Depends(get_workspace),
+        workspace: WorkspaceDep,
     ) -> dict[str, Any]:
         try:
             return workspace.jobs.get(job_id)
@@ -123,7 +125,7 @@ def _system_router() -> APIRouter:
 
     @router.get("/providers/health")
     def provider_health(
-        workspace: WorkspaceContext = Depends(get_workspace),
+        workspace: WorkspaceDep,
     ) -> dict[str, Any]:
         return {
             "embedding": workspace.model_space(),

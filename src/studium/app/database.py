@@ -7,7 +7,7 @@ source chunks, study events, mastery history, and user-controlled preferences.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -79,8 +79,8 @@ source_chunks = Table(
     Column("text", Text, nullable=False),
     Column("section", Text),
     Column("page", Integer),
-    Column("timestamp_start", Float),
-    Column("timestamp_end", Float),
+    Column("timestamp_start", Float()),
+    Column("timestamp_end", Float()),
     Column("char_start", Integer),
     Column("char_end", Integer),
     Column("token_count", Integer, nullable=False, default=0),
@@ -223,11 +223,11 @@ retention_cards = Table(
     Column("prompt_hash", String(64), nullable=False),
     Column("state", String(32), nullable=False, default="new"),
     Column("interval_days", Integer, nullable=False, default=0),
-    Column("ease_factor", Float, nullable=False, default=2.5),
+    Column("ease_factor", Float(), nullable=False, default=2.5),
     Column("repetitions", Integer, nullable=False, default=0),
     Column("lapses", Integer, nullable=False, default=0),
-    Column("difficulty", Float, nullable=False, default=0.3),
-    Column("stability", Float, nullable=False, default=0.0),
+    Column("difficulty", Float(), nullable=False, default=0.3),
+    Column("stability", Float(), nullable=False, default=0.0),
     Column("last_reviewed_at", String(32)),
     Column("next_review_at", String(32), nullable=False),
     Column("pinned", Boolean, nullable=False, default=False),
@@ -251,7 +251,7 @@ review_events = Table(
     Column("module_id", String(128)),
     Column("response", Text),
     Column("evaluation", String(24), nullable=False),
-    Column("score", Float, nullable=False),
+    Column("score", Float(), nullable=False),
     Column("confidence", Integer),
     Column("latency_ms", Integer),
     Column("hints_used", Integer, nullable=False, default=0),
@@ -267,7 +267,7 @@ mastery_snapshots = Table(
     Column("id", String(64), primary_key=True),
     Column("concept_id", String(128), nullable=False),
     Column("module_id", String(128)),
-    Column("score", Float, nullable=False),
+    Column("score", Float(), nullable=False),
     Column("state", String(32), nullable=False),
     Column("signals_json", Text, nullable=False),
     Column("created_at", String(32), nullable=False),
@@ -285,7 +285,7 @@ profile_observations = Table(
     Column("category", String(48), nullable=False),
     Column("statement", Text, nullable=False),
     Column("evidence_json", Text, nullable=False, default="[]"),
-    Column("confidence", Float, nullable=False),
+    Column("confidence", Float(), nullable=False),
     Column("status", String(24), nullable=False, default="proposed"),
     Column("pinned", Boolean, nullable=False, default=False),
     Column("source", String(32), nullable=False, default="inferred"),
@@ -308,7 +308,7 @@ jobs = Table(
     Column("id", String(64), primary_key=True),
     Column("job_type", String(48), nullable=False),
     Column("status", String(32), nullable=False),
-    Column("progress", Float, nullable=False, default=0.0),
+    Column("progress", Float(), nullable=False, default=0.0),
     Column("message", Text),
     Column("payload_json", Text, nullable=False, default="{}"),
     Column("result_json", Text),
@@ -343,7 +343,7 @@ def create_app_engine(db_path: Path, *, busy_timeout_ms: int = 5000) -> Engine:
 
 
 @contextmanager
-def app_transaction(engine: Engine) -> Iterator[Connection]:
+def app_transaction(engine: Engine) -> Generator[Connection, None, None]:
     with engine.begin() as connection:
         yield connection
 
