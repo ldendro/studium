@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 from sqlalchemy import select
@@ -21,7 +20,7 @@ from studium.index.search import (
     HybridSearchOptions,
     search_concepts,
 )
-from studium.index.search.models import ConceptSearchResult, RankedConceptCandidate
+from studium.index.search.models import RankedConceptCandidate
 from studium.index.vector.models import ModelSpaceFilter
 from studium.parsing import parse_concept_note
 from studium.recommend import recommend
@@ -98,11 +97,7 @@ def explain_match(candidate: dict[str, Any] | RankedConceptCandidate) -> list[st
     modules = raw.get("matching_modules", [])
     for module in modules[:2]:
         explanations.append(f"Matched module: {module['title']}")
-    channels = {
-        str(channel.get("channel"))
-        for channel in raw.get("channels", [])
-        if isinstance(channel, dict)
-    }
+    channels = _channel_names(raw.get("channels"))
     if "semantic_vector" in channels:
         explanations.append("Semantically related")
     if "identity_vector" in channels and not explanations:
@@ -113,11 +108,7 @@ def explain_match(candidate: dict[str, Any] | RankedConceptCandidate) -> list[st
 
 
 def explain_module_match(module: dict[str, Any]) -> list[str]:
-    channels = {
-        str(channel.get("channel"))
-        for channel in module.get("channels", [])
-        if isinstance(channel, dict)
-    }
+    channels = _channel_names(module.get("channels"))
     explanations: list[str] = []
     if "fts" in channels:
         explanations.append("Matched module title or focus")
@@ -326,3 +317,15 @@ def _counter_options(counter: Counter[str]) -> list[dict[str, Any]]:
         {"value": value, "label": value.replace("_", " ").title(), "count": count}
         for value, count in sorted(counter.items(), key=lambda item: (-item[1], item[0]))
     ]
+
+
+def _channel_names(value: Any) -> set[str]:
+    names: set[str] = set()
+    if not isinstance(value, list):
+        return names
+    for item in cast(list[Any], value):
+        if isinstance(item, dict):
+            channel = cast(dict[str, Any], item).get("channel")
+            if channel is not None:
+                names.add(str(channel))
+    return names

@@ -1,11 +1,15 @@
 import { AlertTriangle, BrainCircuit, Inbox, LayoutDashboard, PenLine, RotateCcw, Settings, Sparkles, TimerReset } from 'lucide-react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { useWorkspace } from './components/workspace-context'
 import { Button } from './components/ui'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
-import { SearchPage } from './pages/SearchPage'
+
+const SearchPage = lazy(() =>
+  import('./pages/SearchPage').then((module) => ({ default: module.SearchPage })),
+)
 
 function App() {
   const { health, loading, error, refresh } = useWorkspace()
@@ -46,7 +50,7 @@ function App() {
         <Route index element={<Navigate to="/search" replace />} />
         <Route
           path="/search"
-          element={<SearchPage />}
+          element={<SearchRoute />}
         />
         <Route
           path="/create/*"
@@ -135,6 +139,16 @@ function App() {
         <Route path="*" element={<Navigate to="/search" replace />} />
       </Route>
     </Routes>
+  )
+}
+
+function SearchRoute() {
+  const location = useLocation()
+  const query = new URLSearchParams(location.search).get('q') ?? ''
+  return (
+    <Suspense fallback={<div className="page"><div className="boot-screen__line" /></div>}>
+      <SearchPage key={query} />
+    </Suspense>
   )
 }
 

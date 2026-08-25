@@ -18,9 +18,17 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { KnowledgeGraph } from '../components/KnowledgeGraph'
 import { Markdown } from '../components/Markdown'
 import { useToast } from '../components/toast-context'
 import { Badge, Button, EmptyState, IconButton, PageHeader, Panel, Skeleton } from '../components/ui'
@@ -42,6 +50,10 @@ const EMPTY_FILTERS: Record<FilterKey, string[]> = {
   review_statuses: [],
 }
 
+const KnowledgeGraph = lazy(() =>
+  import('../components/KnowledgeGraph').then((module) => ({ default: module.KnowledgeGraph })),
+)
+
 export function SearchPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
@@ -53,14 +65,6 @@ export function SearchPage() {
   const [selectedModule, setSelectedModule] = useState<string | null>(params.get('module'))
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [filtersOpen, setFiltersOpen] = useState(false)
-
-  useEffect(() => {
-    const externalQuery = params.get('q') ?? ''
-    if (externalQuery !== query) {
-      setInput(externalQuery)
-      setQuery(externalQuery)
-    }
-  }, [params, query])
 
   const facetsQuery = useQuery({
     queryKey: ['search-facets'],
@@ -284,7 +288,9 @@ export function SearchPage() {
                 <Skeleton className="graph-loading__line" />
               </div>
             ) : graphQuery.data?.nodes.length ? (
-              <KnowledgeGraph graph={graphQuery.data} onSelect={selectConcept} />
+              <Suspense fallback={<div className="graph-loading"><Skeleton className="graph-loading__node" /></div>}>
+                <KnowledgeGraph graph={graphQuery.data} onSelect={selectConcept} />
+              </Suspense>
             ) : (
               <EmptyState
                 compact
@@ -505,7 +511,6 @@ function ConceptView({
   const targetRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!targetModule) return
-    setOpenModules((current) => new Set(current).add(targetModule))
     window.setTimeout(() => targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
   }, [targetModule])
 
