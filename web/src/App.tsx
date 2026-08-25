@@ -1,10 +1,11 @@
-import { AlertTriangle, BrainCircuit, Inbox, LayoutDashboard, PenLine, RotateCcw, Search, Settings, Sparkles, TimerReset } from 'lucide-react'
+import { AlertTriangle, BrainCircuit, Inbox, LayoutDashboard, PenLine, RotateCcw, Settings, Sparkles, TimerReset } from 'lucide-react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { useWorkspace } from './components/workspace-context'
 import { Button } from './components/ui'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
+import { SearchPage } from './pages/SearchPage'
 
 function App() {
   const { health, loading, error, refresh } = useWorkspace()
@@ -45,15 +46,7 @@ function App() {
         <Route index element={<Navigate to="/search" replace />} />
         <Route
           path="/search"
-          element={
-            <PlaceholderPage
-              eyebrow="Explore"
-              title="Find the knowledge already in your vault."
-              description="Search concepts, aliases, and scaffold modules with graph context."
-            >
-              <Search size={26} />
-            </PlaceholderPage>
-          }
+          element={<SearchPage />}
         />
         <Route
           path="/create/*"
