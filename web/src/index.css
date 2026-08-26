@@ -48,6 +48,10 @@ html {
   background: var(--bg);
 }
 
+#root {
+  min-height: 100vh;
+}
+
 body {
   min-width: 320px;
   min-height: 100vh;

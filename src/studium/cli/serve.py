@@ -18,6 +18,10 @@ def cmd_serve(args: argparse.Namespace) -> int:
     vault = Path(args.vault).expanduser().resolve() if args.vault else None
     app_data = Path(args.app_data).expanduser().resolve() if args.app_data else None
     frontend = Path(args.frontend).expanduser().resolve() if args.frontend else None
+    if frontend is None:
+        default_frontend = Path.cwd() / "web" / "dist"
+        if (default_frontend / "index.html").is_file():
+            frontend = default_frontend.resolve()
     if vault is None:
         remembered = load_last_workspace(app_data)
         if remembered is not None:
@@ -35,6 +39,10 @@ def cmd_serve(args: argparse.Namespace) -> int:
     print(f"Studium is running at {url}")
     if vault is not None:
         print(f"Vault: {vault}")
+    if frontend is not None and (frontend / "index.html").is_file():
+        print(f"Frontend: {frontend}")
+    else:
+        print("Frontend: not built. Run `cd web && npm install && npm run build`.")
     print(f"Content-safe log: {log_path}")
     uvicorn.run(
         app,

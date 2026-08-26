@@ -14,8 +14,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse
 from starlette.middleware.base import RequestResponseEndpoint
 
 from studium.api.dependencies import RegistryDep, WorkspaceDep, get_registry
@@ -51,7 +50,12 @@ def create_app(
     app.state.workspace_registry = registry
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_origins=[
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+            "http://127.0.0.1:8765",
+            "http://localhost:8765",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -289,24 +293,91 @@ def _include_feature_routers(app: FastAPI) -> None:
         app.include_router(module.router)
 
 
-def _mount_frontend(app: FastAPI, frontend_dir: Path | None) -> None:
-    root = (
-        frontend_dir.expanduser().resolve()
-        if frontend_dir is not None
-        else Path(__file__).resolve().parents[3] / "web" / "dist"
-    )
-    index = root / "index.html"
-    assets = root / "assets"
-    if assets.is_dir():
-        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+def _resolve_frontend_dir(frontend_dir: Path | None) -> Path:
+    if frontend_dir is not None:
+        return frontend_dir.expanduser().resolve()
+    here = Path(__file__).resolve()
+    candidates = [Path.cwd() / "web" / "dist"]
+    if len(here.parents) > 3:
+        candidates.append(here.parents[3] / "web" / "dist")
+    for candidate in candidates:
+        if (candidate / "index.html").is_file():
+            return candidate.resolve()
+    return candidates[0].resolve()
 
-    @app.get("/{path:path}", include_in_schema=False)
-    def spa(path: str) -> FileResponse:
-        if path.startswith("api/"):
+
+_ASSET_MEDIA_TYPES = {
+    ".css": "text/css",
+    ".html": "text/html",
+    ".ico": "image/x-icon",
+    ".js": "text/javascript",
+    ".json": "application/json",
+    ".map": "application/json",
+    ".mjs": "text/javascript",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".txt": "text/plain",
+    ".webp": "image/webp",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+}
+
+
+def _file_response(path: Path) -> FileResponse:
+    return FileResponse(path, media_type=_ASSET_MEDIA_TYPES.get(path.suffix.lower()))
+
+
+def _mount_frontend(app: FastAPI, frontend_dir: Path | None) -> None:
+    root = _resolve_frontend_dir(frontend_dir)
+    index = root / "index.html"
+
+    @app.api_route(
+        "/{path:path}",
+        methods=["GET", "HEAD"],
+        include_in_schema=False,
+        response_model=None,
+    )
+    def spa(path: str) -> FileResponse | HTMLResponse:
+        if path == "api" or path.startswith("api/"):
             raise HTTPException(status_code=404, detail="API route not found.")
-        if not index.is_file():
-            raise HTTPException(
-                status_code=503,
-                detail="Frontend build is unavailable. Run the web development server or build it.",
-            )
-        return FileResponse(index)
+        if path:
+            candidate = (root / path).resolve()
+            if _is_inside(candidate, root) and candidate.is_file():
+                return _file_response(candidate)
+        if index.is_file():
+            return _file_response(index)
+        return HTMLResponse(_FRONTEND_MISSING_HTML, status_code=503)
+
+
+def _is_inside(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+_FRONTEND_MISSING_HTML = """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studium frontend is not built</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+        background: #0c1016; color: #edf0f4; font-family: system-ui, sans-serif; }
+      main { max-width: 36rem; padding: 2rem; }
+      code { color: #deb66a; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p>Frontend build missing</p>
+      <h1>Studium needs the React client before it can open.</h1>
+      <p>From the repository root, install the UI, build it, then serve it:</p>
+      <p>
+        <code>cd web && npm install && npm run build && cd .. && make app</code>
+      </p>
+    </main>
+  </body>
+</html>
+"""

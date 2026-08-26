@@ -84,3 +84,38 @@ def test_workspace_create_demo_search_and_product_controls(
     closed = client.post("/api/workspace/close")
     assert closed.status_code == 200
     assert closed.json()["workspace_open"] is False
+
+
+def test_missing_frontend_explains_build_steps(tmp_path: Path) -> None:
+    app = create_app(app_data_dir=tmp_path / "app-data", frontend_dir=tmp_path / "missing-dist")
+    with TestClient(app) as test_client:
+        response = test_client.get("/")
+        assert response.status_code == 503
+        assert "text/html" in response.headers["content-type"]
+        assert "npm run build" in response.text
+
+
+def test_spa_serves_javascript_assets_instead_of_index(tmp_path: Path) -> None:
+    dist = tmp_path / "dist"
+    assets = dist / "assets"
+    assets.mkdir(parents=True)
+    (dist / "index.html").write_text(
+        "<!doctype html><div id='root'>shell</div><script src='/assets/app.js'></script>",
+        encoding="utf-8",
+    )
+    (assets / "app.js").write_text("window.__studium = true;", encoding="utf-8")
+    app = create_app(app_data_dir=tmp_path / "app-data", frontend_dir=dist)
+    with TestClient(app) as test_client:
+        html = test_client.get("/")
+        assert html.status_code == 200
+        assert "shell" in html.text
+        javascript = test_client.get("/assets/app.js")
+        assert javascript.status_code == 200
+        assert "window.__studium" in javascript.text
+        content_type = javascript.headers["content-type"]
+        assert "javascript" in content_type
+        assert "text/html" not in content_type
+        nested = test_client.get("/search")
+        assert nested.status_code == 200
+        assert "shell" in nested.text
+        assert "text/html" in nested.headers["content-type"]
