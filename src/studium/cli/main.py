@@ -150,6 +150,12 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
     serve.add_argument(
+        "--replace",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Stop whatever is already listening on the port, then start Studium",
+    )
+    serve.add_argument(
         "--open-browser",
         action=argparse.BooleanOptionalAction,
         default=True,

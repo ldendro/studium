@@ -36,7 +36,7 @@ dev:
 	$(WEB) npm run dev
 
 app: build
-	$(UV) run studium serve --frontend "$(CURDIR)/web/dist"
+	$(UV) run studium serve --replace --frontend "$(CURDIR)/web/dist"
 
 e2e: build
 	$(WEB) npm run e2e

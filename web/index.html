@@ -15,16 +15,25 @@
         'error',
         function (event) {
           var target = event.target
-          if (!target || (target.tagName !== 'SCRIPT' && target.tagName !== 'LINK')) return
+          if (!target) return
+          var rel = (target.rel || '').toLowerCase()
+          var isScript = target.tagName === 'SCRIPT'
+          var isStylesheet =
+            target.tagName === 'LINK' &&
+            (rel.indexOf('stylesheet') !== -1 || rel.indexOf('modulepreload') !== -1)
+          if (!isScript && !isStylesheet) return
           var root = document.getElementById('root')
           if (!root) return
           root.innerHTML =
             '<main style="min-height:100vh;display:grid;place-items:center;background:#0c1016;color:#edf0f4;font-family:system-ui,sans-serif;padding:2rem">' +
             '<div style="max-width:36rem"><p>Display problem</p>' +
             '<h1>Studium could not load its interface files.</h1>' +
-            '<p>Use the local app address <code style="color:#deb66a">http://127.0.0.1:8765</code>, not a file on disk.</p>' +
-            '<p>From the repository root:</p>' +
-            '<p><code style="color:#deb66a">cd web && npm install && npm run build && cd .. && make app</code></p></div></main>'
+            '<p>Port 8765 is often still held by an earlier Studium process, so the new app never starts.</p>' +
+            '<p>In the old terminal, press Ctrl+C, or run:</p>' +
+            '<p><code style="color:#deb66a">kill $(lsof -nP -t -iTCP:8765 -sTCP:LISTEN)</code></p>' +
+            '<p>Then from the repository root:</p>' +
+            '<p><code style="color:#deb66a">make app</code></p>' +
+            '<p>Open <code style="color:#deb66a">http://127.0.0.1:8765</code> and refresh.</p></div></main>'
         },
         true,
       )

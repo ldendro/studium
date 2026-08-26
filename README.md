@@ -53,11 +53,15 @@ Build the client and serve the local product (API + production frontend):
 make app
 ```
 
-This runs `studium serve --frontend web/dist` at http://127.0.0.1:8765. On first
-launch the onboarding screen can open an existing vault, create a new one, or
-import a ZIP. Checking **Seed the guided demonstration workspace** creates a
-coherent vault that exercises alias search, graph context, sources, review,
-backlog, retention, mastery, and profile.
+This runs `studium serve --replace --frontend web/dist` at http://127.0.0.1:8765.
+If an earlier Studium process is still bound to that port, `make app` stops it
+and starts a fresh server. You can also press Ctrl+C in the old terminal, or
+run `kill $(lsof -nP -t -iTCP:8765 -sTCP:LISTEN)`.
+
+On first launch the onboarding screen can open an existing vault, create a new
+one, or import a ZIP. Checking **Seed the guided demonstration workspace**
+creates a coherent vault that exercises alias search, graph context, sources,
+review, backlog, retention, mastery, and profile.
 
 Development UI with Vite (proxies `/api` to the local service):
 
