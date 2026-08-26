@@ -10,6 +10,11 @@ dependencies = [
     "sqlalchemy>=2",
     "platformdirs>=4",
     "numpy>=2",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.4",
+    "python-multipart>=0.0.32",
+    "pypdf>=6.16.2",
+    "beautifulsoup4>=4.15.0",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +24,7 @@ dev = [
     "ruff>=0.6",
     "pyright[nodejs]>=1.1",
     "pre-commit>=3.7",
+    "httpx>=0.28",
 ]
 embeddings = [
     "sentence-transformers>=3",

@@ -19,6 +19,8 @@ from studium.cli.graph import (
     cmd_graph_status,
     cmd_graph_sync,
 )
+from studium.cli.seed import cmd_seed_demo
+from studium.cli.serve import cmd_serve
 from studium.cli.validate_note import cmd_validate_note
 from studium.cli.validate_vault import cmd_validate_vault
 
@@ -140,6 +142,39 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_graph_flags(eval_rec)
     eval_rec.add_argument("--cases", default=None, help="Optional cases directory or YAML file")
     eval_rec.set_defaults(func=cmd_graph_evaluate_recommendations)
+
+    serve = subparsers.add_parser("serve", help="Run the local Studium application")
+    serve.add_argument("--vault", default=None, help="Vault to open on startup")
+    serve.add_argument("--app-data", default=None, help="Optional application-data directory")
+    serve.add_argument("--frontend", default=None, help="Optional built frontend directory")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8765)
+    serve.add_argument(
+        "--replace",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Stop whatever is already listening on the port, then start Studium",
+    )
+    serve.add_argument(
+        "--open-browser",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Open Studium in the default browser",
+    )
+    serve.add_argument(
+        "--log-level",
+        choices=("critical", "error", "warning", "info", "debug", "trace"),
+        default="info",
+    )
+    serve.set_defaults(func=cmd_serve)
+
+    seed = subparsers.add_parser(
+        "seed-demo",
+        help="Create or refresh the coherent demonstration workspace",
+    )
+    seed.add_argument("--vault", required=True, help="Vault directory to seed")
+    seed.add_argument("--app-data", default=None, help="Optional application-data directory")
+    seed.set_defaults(func=cmd_seed_demo)
 
     return parser
 

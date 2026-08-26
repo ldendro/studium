@@ -16,6 +16,8 @@ class ConceptType(StrEnum):
 
 class SourceType(StrEnum):
     STUDIUM = "studium"
+    SELF_STUDY = "self_study"
+    BACKLOG = "backlog"
     BOOK = "book"
     VIDEO = "video"
     PAPER = "paper"
@@ -56,13 +58,22 @@ class NoteStatus(StrEnum):
 
 class ReviewStatus(StrEnum):
     NOT_SUBMITTED = "not_submitted"
+    SUBMITTED = "submitted"
     IN_REVIEW = "in_review"
+    REVIEWING = "reviewing"
+    CHANGES_REQUESTED = "changes_requested"
     APPROVED = "approved"
 
 
 class NoteVaultStatus(StrEnum):
     DRAFT = "draft"
     ACCEPTED = "accepted"
+    ARCHIVED = "archived"
+
+
+class GraphVisibility(StrEnum):
+    HIDDEN = "hidden"
+    VISIBLE = "visible"
 
 
 class ScaffoldModuleType(StrEnum):
@@ -89,6 +100,7 @@ class ScaffoldModuleOrigin(StrEnum):
     USER_REQUESTED = "user_requested"
     SOURCE_SUGGESTED = "source_suggested"
     REVIEW_SUGGESTED = "review_suggested"
+    RETENTION_SUGGESTED = "retention_suggested"
     MANUAL = "manual"
 
 

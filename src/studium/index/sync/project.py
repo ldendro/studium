@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -80,7 +81,8 @@ def project_concept_note(
     module_inputs: list[tuple[str, str, str]] = []
     module_search_documents: list[dict[str, Any]] = []
     for module in metadata.scaffold_modules:
-        input_text = module_input_from_metadata(module)
+        module_body, heading, anchor = _extract_module_body(parsed.body, module.title)
+        input_text = module_input_from_metadata(module, body=module_body)
         input_hash = hash_text(input_text)
         module_inputs.append((module.id, input_text, input_hash))
         module_rows.append(
@@ -92,8 +94,8 @@ def project_concept_note(
                 "status": str(module.status),
                 "origin": None if module.origin is None else str(module.origin),
                 "focus": module.focus,
-                "heading": None,
-                "anchor": None,
+                "heading": heading,
+                "anchor": anchor,
                 "segment_count": 1,
                 "module_input_hash": input_hash,
                 "indexed_revision": indexed_revision,
@@ -103,7 +105,12 @@ def project_concept_note(
             {
                 "module_id": module.id,
                 "concept_id": concept_id,
-                "document_text": _module_search_text(module.title, str(module.type), module.focus),
+                "document_text": _module_search_text(
+                    module.title,
+                    str(module.type),
+                    module.focus,
+                    module_body,
+                ),
                 "indexed_revision": indexed_revision,
             }
         )
@@ -226,11 +233,58 @@ def _concept_search_text(title: str, aliases: list[str], overview: str, domains:
     return " ".join(parts)
 
 
-def _module_search_text(title: str, module_type: str, focus: str | None) -> str:
+def _module_search_text(
+    title: str,
+    module_type: str,
+    focus: str | None,
+    body: str = "",
+) -> str:
     parts = [title, module_type]
     if focus:
         parts.append(focus)
+    if body:
+        parts.append(body)
     return " ".join(parts)
+
+
+def _extract_module_body(body: str, title: str) -> tuple[str, str | None, str | None]:
+    """Extract a metadata-declared module's H3 section from canonical Markdown."""
+
+    lines = body.splitlines()
+    target = title.strip().casefold()
+    start: int | None = None
+    end = len(lines)
+    in_fence = False
+    fence_char: str | None = None
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith(("```", "~~~")):
+            marker = stripped[0]
+            if not in_fence:
+                in_fence = True
+                fence_char = marker
+            elif marker == fence_char:
+                in_fence = False
+                fence_char = None
+            continue
+        if in_fence:
+            continue
+        match = re.match(r"^(#{1,6})\s+(.+?)\s*$", stripped)
+        if match is None:
+            continue
+        level = len(match.group(1))
+        heading_title = match.group(2).strip()
+        if start is None and level == 3 and heading_title.casefold() == target:
+            start = index
+            continue
+        if start is not None and level <= 3:
+            end = index
+            break
+    if start is None:
+        return "", None, None
+    section = "\n".join(lines[start + 1 : end]).strip()
+    anchor = re.sub(r"[^a-z0-9]+", "-", title.casefold()).strip("-")
+    return section, f"### {title}", anchor
 
 
 def _encounter_row(concept_id: str, encounter: Any) -> dict[str, Any]:
