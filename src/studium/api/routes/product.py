@@ -253,7 +253,7 @@ def retry_product_job(
     service = ProductService(workspace)
     job_type = str(job["job_type"])
     payload = job.get("payload")
-    values = payload if isinstance(payload, dict) else {}
+    values: dict[str, Any] = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
     if job_type == "workspace_export":
         kind = str(values.get("kind"))
         if kind not in {"markdown", "sources", "complete"}:

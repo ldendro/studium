@@ -144,7 +144,14 @@ export function PageHeader({
 export function Progress({ value, label }: { value: number; label?: string }) {
   const normalized = Math.max(0, Math.min(1, value))
   return (
-    <div className="progress" aria-label={label} role="progressbar" aria-valuenow={normalized * 100}>
+    <div
+      className="progress"
+      aria-label={label}
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(normalized * 100)}
+    >
       <span style={{ width: `${normalized * 100}%` }} />
     </div>
   )

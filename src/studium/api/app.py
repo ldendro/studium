@@ -9,7 +9,7 @@ import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 from uuid import uuid4
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request, Response, status
@@ -203,7 +203,7 @@ def _system_router() -> APIRouter:
         if job["status"] in {"queued", "running"}:
             raise HTTPException(status_code=409, detail="Job is still active.")
         payload = job.get("payload")
-        values = payload if isinstance(payload, dict) else {}
+        values: dict[str, Any] = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
         job_type = str(job["job_type"])
         try:
             if job_type == "index_sync":

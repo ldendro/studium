@@ -1433,6 +1433,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "httpx" },
     { name = "pre-commit" },
     { name = "pyright", extra = ["nodejs"] },
     { name = "pytest" },
@@ -1450,6 +1451,7 @@ vector-ext = [
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.15.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28" },
     { name = "numpy", specifier = ">=2" },
     { name = "platformdirs", specifier = ">=4" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7" },

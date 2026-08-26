@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -60,3 +61,37 @@ class AppConfig:
             self.logs_dir,
         ):
             directory.mkdir(parents=True, exist_ok=True)
+
+
+def last_workspace_path(app_data_dir: Path | None = None) -> Path:
+    return resolve_application_data_dir(app_data_dir) / "last-workspace.json"
+
+
+def remember_last_workspace(vault_root: Path, app_data_dir: Path | None = None) -> None:
+    payload = {
+        "vault_path": str(vault_root.expanduser().resolve()),
+        "app_data_path": (
+            None if app_data_dir is None else str(Path(app_data_dir).expanduser().resolve())
+        ),
+    }
+    path = last_workspace_path(app_data_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def load_last_workspace(app_data_dir: Path | None = None) -> tuple[Path, Path | None] | None:
+    path = last_workspace_path(app_data_dir)
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    vault = Path(str(payload.get("vault_path") or "")).expanduser()
+    if not vault.is_dir():
+        return None
+    raw_app = payload.get("app_data_path")
+    app_data = None if raw_app in {None, ""} else Path(str(raw_app)).expanduser()
+    return vault.resolve(), None if app_data is None else app_data.resolve()

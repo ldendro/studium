@@ -11,12 +11,13 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, cast
 
-from studium.app.config import AppConfig
+from studium.app.config import AppConfig, remember_last_workspace
 from studium.app.database import (
     app_transaction,
     create_app_engine,
     get_setting,
     set_setting,
+    sources,
 )
 from studium.app.jobs import JobManager
 from studium.app.migrations import MigrationResult, migrate_app_database, utc_now
@@ -89,6 +90,7 @@ class WorkspaceContext:
         )
         self.llm_provider: LLMProvider | None = build_llm_provider(self.provider_settings)
         self.jobs = JobManager(self.app_engine)
+        self._recover_interrupted_sources()
         self.last_sync: SyncReport | None = None
         if sync_on_open:
             self.sync(embed=True)
@@ -156,6 +158,7 @@ class WorkspaceContext:
             }
         return {
             "status": "ok",
+            "workspace_open": True,
             "vault_id": self.vault_id,
             "vault_name": self.vault.root.name,
             "vault_path": str(self.vault.root),
@@ -220,9 +223,29 @@ class WorkspaceContext:
             if not isinstance(payload, dict):
                 return ProviderSettings()
             return provider_settings_from_mapping(cast(dict[str, Any], payload))
-        except (TypeError, ValueError, json.JSONDecodeError):
+        except (AttributeError, TypeError, ValueError):
             logger.warning("invalid_provider_settings_ignored")
             return ProviderSettings()
+
+    def _recover_interrupted_sources(self) -> None:
+        with app_transaction(self.app_engine) as connection:
+            result = connection.execute(
+                sources.update()
+                .where(sources.c.status.in_(["queued", "extracting", "chunking", "embedding"]))
+                .values(
+                    status="failed",
+                    processing_error=(
+                        "Processing was interrupted when Studium stopped. "
+                        "Retry this source from the library."
+                    ),
+                    updated_at=utc_now(),
+                )
+            )
+        if result.rowcount:
+            logger.warning(
+                "source_jobs_recovered",
+                extra={"recovered_source_count": result.rowcount},
+            )
 
 
 class WorkspaceRegistry:
@@ -253,6 +276,10 @@ class WorkspaceRegistry:
                 sync_on_open=sync_on_open,
             )
             self._active = workspace
+            remember_last_workspace(
+                workspace.config.resolved_vault_root,
+                workspace.config.resolved_app_data_dir,
+            )
             if previous is not None:
                 previous.close()
             return workspace

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from studium.index.paths import resolve_application_data_dir
 
@@ -90,14 +91,15 @@ def _safe_value(value: Any) -> Any:
     if isinstance(value, Path):
         return value.name
     if isinstance(value, dict):
+        mapping = cast(dict[Any, Any], value)
         return {
             str(key): (
                 "[redacted]"
                 if any(fragment in str(key).casefold() for fragment in _SENSITIVE_FRAGMENTS)
                 else _safe_value(item)
             )
-            for key, item in value.items()
+            for key, item in mapping.items()
         }
     if isinstance(value, list | tuple | set):
-        return [_safe_value(item) for item in value]
+        return [_safe_value(item) for item in cast(Iterable[Any], value)]
     return type(value).__name__

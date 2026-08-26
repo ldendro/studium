@@ -122,6 +122,9 @@ def import_vault_archive(
         if imported_files == 0:
             raise ValueError("Archive contains no importable files.")
         os.replace(staging, target)
+    except zipfile.BadZipFile as exc:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise ValueError("The selected file is not a readable ZIP archive.") from exc
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
@@ -143,10 +144,8 @@ def seed_demo_workspace(workspace: WorkspaceContext) -> dict[str, Any]:
 
     momentum_id = generate_concept_id("Momentum Optimization")
     review_session = None
-    try:
+    with suppress(KeyError, ValueError):
         review_session = ReviewService(workspace).submit(momentum_id)
-    except (KeyError, ValueError):
-        pass
     return {
         "seeded": True,
         "created_concepts": created_concepts,
@@ -229,6 +228,11 @@ def _concept_markdown(definition: DemoConcept, *, source_id: str) -> str:
         for relation, target, _role in definition.relationships
         if relation != RelationshipType.DEPENDS_ON
     ]
+    open_questions = (
+        "No blocking gaps remain."
+        if definition.accepted
+        else "- [ ] Contrast momentum with an adaptive learning-rate method."
+    )
     body = f"""# {definition.title}
 
 ## Concept Overview
@@ -253,7 +257,7 @@ def _concept_markdown(definition: DemoConcept, *, source_id: str) -> str:
 
 ## Open Questions / Gaps
 
-{"No blocking gaps remain." if definition.accepted else "- [ ] Contrast momentum with an adaptive learning-rate method."}
+{open_questions}
 """
     return serialize_concept_note(metadata, body)
 
@@ -330,7 +334,7 @@ _DEMO_CONCEPTS = (
                 "module_learning_rate_debugging",
                 "Misconception Debugging",
                 ScaffoldModuleType.MISCONCEPTION_DEBUGGING,
-                "A lower loss after one step does not prove the rate is stable. Check a trajectory, "
+                "A lower loss after one step does not prove stability. Check a trajectory, "
                 "gradient norms, and sensitivity to a modest rate change.",
             ),
         ),
@@ -349,14 +353,14 @@ _DEMO_CONCEPTS = (
                 "module_gradient_descent_reconstruction",
                 "Mechanism From Memory",
                 ScaffoldModuleType.CONCEPTUAL_EXPLANATION,
-                "State the objective, compute a gradient, choose a learning rate, update parameters, "
+                "State the objective, compute a gradient, choose a learning rate, update state, "
                 "and explain the local assumption behind the direction.",
             ),
             DemoModule(
                 "module_gradient_descent_example",
                 "One-Dimensional Worked Example",
                 ScaffoldModuleType.WORKED_EXAMPLE,
-                "Starting from x=4 on f(x)=x² with rate 0.1 gives x'=3.2. Verify the objective falls "
+                "From x=4 on f(x)=x² with rate 0.1, x'=3.2. Verify that the objective falls "
                 "and compare with a rate of 1.1.",
             ),
             DemoModule(

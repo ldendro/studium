@@ -10,6 +10,7 @@ from pathlib import Path
 import uvicorn
 
 from studium.api import create_app
+from studium.app.config import load_last_workspace
 from studium.app.logging import configure_content_safe_logging
 
 
@@ -17,6 +18,12 @@ def cmd_serve(args: argparse.Namespace) -> int:
     vault = Path(args.vault).expanduser().resolve() if args.vault else None
     app_data = Path(args.app_data).expanduser().resolve() if args.app_data else None
     frontend = Path(args.frontend).expanduser().resolve() if args.frontend else None
+    if vault is None:
+        remembered = load_last_workspace(app_data)
+        if remembered is not None:
+            vault, remembered_app_data = remembered
+            if app_data is None:
+                app_data = remembered_app_data
     log_path = configure_content_safe_logging(
         app_data_dir=app_data,
         level=args.log_level,

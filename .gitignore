@@ -30,6 +30,10 @@ node_modules/
 web/dist/
 web/.vite/
 *.tsbuildinfo
+web/playwright-report/
+web/test-results/
+web/blob-report/
+web/playwright/.cache/
 
 # Local application/demo data
 demo_vault/

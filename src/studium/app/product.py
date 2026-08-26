@@ -14,7 +14,7 @@ import zipfile
 from collections.abc import Callable, Iterator
 from dataclasses import asdict
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import uuid4
 
 from sqlalchemy import delete, select
@@ -163,74 +163,76 @@ class ProductService:
         target = self.workspace.config.backups_dir / f"{identifier}.zip"
         checksums: dict[str, str] = {}
         progress(0.03, "Taking a consistent application snapshot")
-        with self.workspace.maintenance_lock():
-            with tempfile.TemporaryDirectory(
+        with (
+            self.workspace.maintenance_lock(),
+            tempfile.TemporaryDirectory(
                 prefix=".studium-backup-",
                 dir=self.workspace.config.backups_dir,
-            ) as temporary:
-                database_snapshot = Path(temporary) / "studium.sqlite"
-                _snapshot_sqlite(self.workspace.config.database_path, database_snapshot)
-                vault_files = list(_tree_files(self.workspace.vault.root))
-                source_files = list(_source_asset_files(self.workspace))
-                with zipfile.ZipFile(
-                    target,
-                    mode="x",
-                    compression=zipfile.ZIP_DEFLATED,
-                    compresslevel=6,
-                ) as archive:
-                    total = max(1, len(vault_files) + len(source_files) + 1)
-                    completed = 0
-                    for relative, path in vault_files:
-                        _write_archive_bytes(
-                            archive,
-                            f"vault/{relative}",
-                            path.read_bytes(),
-                            checksums,
-                        )
-                        completed += 1
-                        progress(
-                            0.08 + completed / total * 0.76,
-                            f"Snapshotting vault ({completed}/{total})",
-                        )
+            ) as temporary,
+        ):
+            database_snapshot = Path(temporary) / "studium.sqlite"
+            _snapshot_sqlite(self.workspace.config.database_path, database_snapshot)
+            vault_files = list(_tree_files(self.workspace.vault.root))
+            source_files = list(_source_asset_files(self.workspace))
+            with zipfile.ZipFile(
+                target,
+                mode="x",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=6,
+            ) as archive:
+                total = max(1, len(vault_files) + len(source_files) + 1)
+                completed = 0
+                for relative, path in vault_files:
                     _write_archive_bytes(
                         archive,
-                        "app/studium.sqlite",
-                        database_snapshot.read_bytes(),
+                        f"vault/{relative}",
+                        path.read_bytes(),
                         checksums,
                     )
                     completed += 1
-                    for archive_name, path in source_files:
-                        _write_archive_bytes(
-                            archive,
-                            f"app/{archive_name}",
-                            path.read_bytes(),
-                            checksums,
-                        )
-                        completed += 1
-                        progress(
-                            0.08 + completed / total * 0.76,
-                            f"Snapshotting local state ({completed}/{total})",
-                        )
-                    soul = self.workspace.config.workspace_dir / "soul.md"
-                    if soul.is_file():
-                        _write_archive_bytes(
-                            archive,
-                            "app/soul.md",
-                            soul.read_bytes(),
-                            checksums,
-                        )
-                    manifest = {
-                        "format": "studium-backup",
-                        "format_version": _BACKUP_FORMAT_VERSION,
-                        "id": identifier,
-                        "created_at": utc_now(),
-                        "vault_id": self.workspace.vault_id,
-                        "vault_name": self.workspace.vault.root.name,
-                        "app_schema_version": self.workspace.migration.after,
-                        "file_count": len(checksums),
-                        "checksums": checksums,
-                    }
-                    archive.writestr("manifest.json", _json_bytes(manifest))
+                    progress(
+                        0.08 + completed / total * 0.76,
+                        f"Snapshotting vault ({completed}/{total})",
+                    )
+                _write_archive_bytes(
+                    archive,
+                    "app/studium.sqlite",
+                    database_snapshot.read_bytes(),
+                    checksums,
+                )
+                completed += 1
+                for archive_name, path in source_files:
+                    _write_archive_bytes(
+                        archive,
+                        f"app/{archive_name}",
+                        path.read_bytes(),
+                        checksums,
+                    )
+                    completed += 1
+                    progress(
+                        0.08 + completed / total * 0.76,
+                        f"Snapshotting local state ({completed}/{total})",
+                    )
+                soul = self.workspace.config.workspace_dir / "soul.md"
+                if soul.is_file():
+                    _write_archive_bytes(
+                        archive,
+                        "app/soul.md",
+                        soul.read_bytes(),
+                        checksums,
+                    )
+                manifest = {
+                    "format": "studium-backup",
+                    "format_version": _BACKUP_FORMAT_VERSION,
+                    "id": identifier,
+                    "created_at": utc_now(),
+                    "vault_id": self.workspace.vault_id,
+                    "vault_name": self.workspace.vault.root.name,
+                    "app_schema_version": self.workspace.migration.after,
+                    "file_count": len(checksums),
+                    "checksums": checksums,
+                }
+                archive.writestr("manifest.json", _json_bytes(manifest))
         progress(1.0, "Backup verified and ready")
         verification = self.verify_backup(identifier)
         if not verification["valid"]:
@@ -262,7 +264,7 @@ class ProductService:
                     checked += 1
                     if actual != expected:
                         errors.append(f"Checksum mismatch: {name}")
-        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        except (KeyError, OSError, ValueError, zipfile.BadZipFile) as exc:
             errors.append(f"{type(exc).__name__}: backup could not be read")
         return {
             "id": identifier,
@@ -432,7 +434,7 @@ class ProductService:
         for path in directory.glob(f"{kind}_*.zip"):
             try:
                 items.append(self._artifact_descriptor(path, kind))
-            except (OSError, ValueError, zipfile.BadZipFile):
+            except (KeyError, OSError, ValueError, zipfile.BadZipFile):
                 continue
         return sorted(
             items,
@@ -463,9 +465,11 @@ class ProductService:
 
 
 def _snapshot_sqlite(source: Path, target: Path) -> None:
-    with sqlite3.connect(source) as source_connection:
-        with sqlite3.connect(target) as target_connection:
-            source_connection.backup(target_connection)
+    with (
+        sqlite3.connect(source) as source_connection,
+        sqlite3.connect(target) as target_connection,
+    ):
+        source_connection.backup(target_connection)
 
 
 def _source_asset_files(workspace: WorkspaceContext) -> Iterator[tuple[str, Path]]:
@@ -514,8 +518,11 @@ def _read_manifest(
     *,
     expected_format: str,
 ) -> dict[str, Any]:
-    payload = json.loads(archive.read("manifest.json"))
-    if not isinstance(payload, dict) or payload.get("format") != expected_format:
+    loaded: Any = json.loads(archive.read("manifest.json"))
+    if not isinstance(loaded, dict):
+        raise ValueError("Artifact manifest is missing or invalid.")
+    payload = cast(dict[str, Any], loaded)
+    if payload.get("format") != expected_format:
         raise ValueError("Artifact manifest is missing or invalid.")
     return payload
 
@@ -523,9 +530,10 @@ def _read_manifest(
 def _string_mapping(value: Any) -> dict[str, str]:
     if not isinstance(value, dict):
         return {}
+    mapping = cast(dict[Any, Any], value)
     return {
         str(key): str(item)
-        for key, item in value.items()
+        for key, item in mapping.items()
         if isinstance(key, str) and isinstance(item, str)
     }
 

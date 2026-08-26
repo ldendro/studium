@@ -19,6 +19,7 @@ from studium.cli.graph import (
     cmd_graph_status,
     cmd_graph_sync,
 )
+from studium.cli.seed import cmd_seed_demo
 from studium.cli.serve import cmd_serve
 from studium.cli.validate_note import cmd_validate_note
 from studium.cli.validate_vault import cmd_validate_vault
@@ -160,6 +161,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="info",
     )
     serve.set_defaults(func=cmd_serve)
+
+    seed = subparsers.add_parser(
+        "seed-demo",
+        help="Create or refresh the coherent demonstration workspace",
+    )
+    seed.add_argument("--vault", required=True, help="Vault directory to seed")
+    seed.add_argument("--app-data", default=None, help="Optional application-data directory")
+    seed.set_defaults(func=cmd_seed_demo)
 
     return parser
 

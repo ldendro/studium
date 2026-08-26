@@ -292,7 +292,7 @@ export function AppShell() {
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="command-dialog__input">
-              <Search size={20} />
+              <Search size={20} aria-hidden />
               <input
                 ref={commandInput}
                 value={query}
@@ -301,6 +301,7 @@ export function AppShell() {
                   if (event.key === 'Enter') submitSearch()
                 }}
                 placeholder="Find a concept, module, or source…"
+                aria-label="Find a concept, module, or source"
               />
               <kbd>Esc</kbd>
             </div>
