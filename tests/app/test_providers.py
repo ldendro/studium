@@ -48,4 +48,5 @@ def test_local_openai_compatible_routing_is_allowed() -> None:
         )
     )
     assert settings.llm_provider == "openai_compatible"
-    assert build_embedding_provider(settings).model_metadata().model_id == "studium/local-feature-hash"
+    model_id = build_embedding_provider(settings).model_metadata().model_id
+    assert model_id == "studium/local-feature-hash"

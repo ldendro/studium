@@ -1,12 +1,16 @@
 import clsx from 'clsx'
 import { LoaderCircle, SearchX } from 'lucide-react'
-import type {
-  ButtonHTMLAttributes,
-  HTMLAttributes,
-  InputHTMLAttributes,
-  PropsWithChildren,
-  ReactNode,
-  TextareaHTMLAttributes,
+import {
+  cloneElement,
+  isValidElement,
+  useId,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type InputHTMLAttributes,
+  type PropsWithChildren,
+  type ReactElement,
+  type ReactNode,
+  type TextareaHTMLAttributes,
 } from 'react'
 import type { NoticeTone } from '../lib/types'
 
@@ -68,27 +72,47 @@ export function Panel({
   )
 }
 
-export function Field({
-  label,
-  hint,
-  children,
-  className,
-}: PropsWithChildren<{ label: string; hint?: string; className?: string }>) {
-  return (
-    <label className={clsx('field', className)}>
-      <span className="field__label">{label}</span>
-      {children}
-      {hint && <span className="field__hint">{hint}</span>}
-    </label>
-  )
-}
-
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={clsx('input', props.className)} />
 }
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={clsx('textarea', props.className)} />
+}
+
+export function Field({
+  label,
+  hint,
+  children,
+  className,
+}: PropsWithChildren<{ label: string; hint?: string; className?: string }>) {
+  const id = useId()
+  const hintId = hint ? `${id}-hint` : undefined
+  const labeled =
+    isValidElement(children) &&
+    (children.type === Input ||
+      children.type === Textarea ||
+      children.type === 'input' ||
+      children.type === 'textarea')
+  const control = labeled
+    ? cloneElement(children as ReactElement<InputHTMLAttributes<HTMLInputElement>>, {
+        id,
+        'aria-describedby': hintId,
+      })
+    : children
+  return (
+    <div className={clsx('field', className)}>
+      <label className="field__label" htmlFor={labeled ? id : undefined}>
+        {label}
+      </label>
+      {control}
+      {hint && (
+        <span className="field__hint" id={hintId}>
+          {hint}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export function EmptyState({

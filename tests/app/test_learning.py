@@ -1,5 +1,7 @@
 """Retention scheduler, mastery labels, and learning-loop services."""
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 from studium.app.learning import (

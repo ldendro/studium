@@ -1,5 +1,7 @@
 """FastAPI local-service tests."""
 
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
+
 from __future__ import annotations
 
 from collections.abc import Generator

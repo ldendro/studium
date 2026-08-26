@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 from studium.index.paths import derive_vault_identifier, resolve_application_data_dir
 
@@ -89,9 +90,10 @@ def load_last_workspace(app_data_dir: Path | None = None) -> tuple[Path, Path | 
         return None
     if not isinstance(payload, dict):
         return None
-    vault = Path(str(payload.get("vault_path") or "")).expanduser()
+    mapping = cast(dict[str, Any], payload)
+    vault = Path(str(mapping.get("vault_path") or "")).expanduser()
     if not vault.is_dir():
         return None
-    raw_app = payload.get("app_data_path")
+    raw_app = mapping.get("app_data_path")
     app_data = None if raw_app in {None, ""} else Path(str(raw_app)).expanduser()
     return vault.resolve(), None if app_data is None else app_data.resolve()

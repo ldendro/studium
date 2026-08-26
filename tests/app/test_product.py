@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -16,19 +17,33 @@ from studium.review import ReviewService
 from studium.serialization.concept_id import generate_concept_id
 
 
-def test_demo_seed_search_review_export_and_backup(workspace: WorkspaceContext, tmp_path: Path) -> None:
+def _search_titles(payload: dict[str, Any]) -> list[str]:
+    ranked = payload.get("ranked_concepts")
+    if not isinstance(ranked, list):
+        return []
+    titles: list[str] = []
+    for item in cast(list[object], ranked):
+        if not isinstance(item, dict):
+            continue
+        title = cast(dict[str, Any], item).get("canonical_title")
+        if title:
+            titles.append(str(title))
+    return titles
+
+
+def test_demo_seed_search_review_export_and_backup(
+    workspace: WorkspaceContext,
+    tmp_path: Path,
+) -> None:
     result = seed_demo_workspace(workspace)
     assert result["seeded"] is True
     assert workspace.vault.exists("concepts/gradient-descent.md")
 
     search = search_workspace(workspace, text="GD")
-    titles = [item["canonical_title"] for item in search["ranked_concepts"]]
-    assert "Gradient Descent" in titles
+    assert "Gradient Descent" in _search_titles(search)
 
     alias_search = search_workspace(workspace, text="Steepest Descent")
-    assert any(
-        item["canonical_title"] == "Gradient Descent" for item in alias_search["ranked_concepts"]
-    )
+    assert "Gradient Descent" in _search_titles(alias_search)
 
     momentum_id = generate_concept_id("Momentum Optimization")
     session = ReviewService(workspace).latest(momentum_id)

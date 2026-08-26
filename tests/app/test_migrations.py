@@ -9,7 +9,11 @@ from sqlalchemy import inspect, text
 
 from studium.app.config import AppConfig
 from studium.app.database import APP_SCHEMA_VERSION, create_app_engine
-from studium.app.migrations import AppSchemaTooNewError, current_schema_version, migrate_app_database
+from studium.app.migrations import (
+    AppSchemaTooNewError,
+    current_schema_version,
+    migrate_app_database,
+)
 
 
 def test_fresh_database_migrates_to_current_schema(tmp_path: Path) -> None:

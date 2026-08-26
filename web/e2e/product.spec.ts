@@ -37,11 +37,11 @@ test('onboarding, demo search, settings, and accessibility', async ({ page }) =>
     timeout: 180_000,
   })
 
-  await page.getByLabel('Search your knowledge').fill('GD')
+  await page.getByRole('textbox', { name: 'Search your knowledge' }).fill('GD')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.getByRole('button', { name: /Gradient Descent/ })).toBeVisible()
 
-  await page.getByLabel('Search your knowledge').fill('Steepest Descent')
+  await page.getByRole('textbox', { name: 'Search your knowledge' }).fill('Steepest Descent')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.getByRole('button', { name: /Gradient Descent/ })).toBeVisible()
 

@@ -1,5 +1,8 @@
 """Create, source, and review API smoke tests against a demo workspace."""
 
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
+# pyright: reportUnknownArgumentType=false
+
 from __future__ import annotations
 
 from collections.abc import Generator

@@ -22,21 +22,14 @@ def test_job_manager_records_success_and_failure(tmp_path: Path) -> None:
             {"embeddings": True},
             lambda progress: {"ok": True} if progress(1.0, "done") is None else None,
         )
-        future = manager._futures[completed["id"]]
-        future.result(timeout=5)
-        assert manager.get(completed["id"])["status"] == "completed"
+        assert manager.wait(completed["id"])["status"] == "completed"
 
         failed = manager.submit(
             "workspace_export",
             {"kind": "markdown"},
             lambda _progress: (_ for _ in ()).throw(RuntimeError("boom")),
         )
-        failed_future = manager._futures[failed["id"]]
-        try:
-            failed_future.result(timeout=5)
-        except RuntimeError:
-            pass
-        stored = manager.get(failed["id"])
+        stored = manager.wait(failed["id"])
         assert stored["status"] == "failed"
         assert stored["error"] is not None
         retried = manager.submit(
@@ -45,9 +38,9 @@ def test_job_manager_records_success_and_failure(tmp_path: Path) -> None:
             lambda progress: {"files": 1} if progress(1.0, "ok") is None else None,
             retry_of_id=failed["id"],
         )
-        manager._futures[retried["id"]].result(timeout=5)
-        assert manager.get(retried["id"])["attempt"] == 2
-        assert manager.get(retried["id"])["retry_of_id"] == failed["id"]
+        finished = manager.wait(retried["id"])
+        assert finished["attempt"] == 2
+        assert finished["retry_of_id"] == failed["id"]
     finally:
         manager.close()
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Lock
@@ -88,7 +89,7 @@ class JobManager:
                     "exception_type": type(exc).__name__,
                 },
             )
-            raise
+            return None
         else:
             self._update(
                 job_id,
@@ -117,6 +118,15 @@ class JobManager:
                 select(jobs).order_by(jobs.c.created_at.desc()).limit(limit)
             ).all()
         return [_decode_job(row_dict(row)) for row in rows]
+
+    def wait(self, job_id: str, *, timeout: float = 10.0) -> dict[str, Any]:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            stored = self.get(job_id)
+            if stored["status"] in {"completed", "failed"}:
+                return stored
+            time.sleep(0.02)
+        raise TimeoutError(f"Job {job_id} did not finish within {timeout} seconds.")
 
     def close(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=False)

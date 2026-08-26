@@ -198,7 +198,12 @@ export function AppShell() {
             <IconButton label="Open navigation" className="mobile-menu" onClick={() => setMobileOpen(true)}>
               <Menu size={20} />
             </IconButton>
-            <button className="command-trigger" type="button" onClick={() => setCommandOpen(true)}>
+            <button
+              className="command-trigger"
+              type="button"
+              aria-label="Open command search"
+              onClick={() => setCommandOpen(true)}
+            >
               <Search size={16} aria-hidden />
               <span>Search your knowledge</span>
               <kbd>
